@@ -2,7 +2,8 @@
 
 import datetime
 
-from casa_logs_mous_props import mous_sizes, mous_short_names
+from casa_logs_mous_props import mous_sizes, mous_short_names, get_asdms_size, ebs_cnt
+import casa_logs_mous_props #.ebs_cnt
 
 too_verbose = False
 
@@ -18,6 +19,7 @@ SECS_TO_DAYS = SECS_TO_HOURS*24
 LAST_CALIB_STAGE = 22
 # For CASA 5.4
 #LAST_CALIB_STAGE = 23
+
 
 class Struct:
     """
@@ -1363,7 +1365,7 @@ def plot_pl_stages_barplots(run_info, stages, stage_names,
     except KeyError:
         mous_size = 'Unknown'
 
-    fig.suptitle('{0}, MOUS: {1}, ASDM size: {2} GB'.
+    fig.suptitle('{0}, MOUS: {1}, ASDM size: {2:.1f} GB'.
                  format(short_name, mous, mous_size),
                  fontsize=FONTSIZE_TITLE, fontweight='bold')
     fig.savefig('{0}_{1}_MOUS_{2}_mpi_{3}.png'.
@@ -1434,15 +1436,15 @@ def do_summed_runtime_plots(infos, name_suffix):
     # TODO: Add opt param string for the plot titles
     gen_bar_plot_summed_times(tasks_full_time, 'full_pl_{0}'.format(name_suffix),
                               total_runs=total_string,
-                              title_text='Full (calib+imag) pipeline')
+                              title_text='All pipeline stages') # Full (calib+imag) pipeline
     gen_bar_plot_summed_times(tasks_calib_time,
                               'calib_pl_{0}'.format(name_suffix),
                               total_runs=total_string,
-                              title_text='Calibration pipeilne')
+                              title_text='Calibration stages')
     gen_bar_plot_summed_times(tasks_imaging_time,
                               'imaging_pl_{0}'.format(name_suffix),
                               total_runs=total_string,
-                              title_text='Imaging pipeline')
+                              title_text='Imaging stages')
 
 
     
@@ -1466,7 +1468,7 @@ def do_summed_runtime_plots(infos, name_suffix):
     gen_bar_plot_summed_times(pl_full_time,
                               'full_pl_{0}'.format(name_suffix),
                               total_runs=total_string,
-                              title_text='Full (calib+imag) pipeline',
+                              title_text='All pipeline stages', # Full (calib+imag) pipeline
                               figname_base='stages_pl_summed_runtime_barplot',
                               rotation=75)
 
@@ -1481,8 +1483,8 @@ def gen_bar_plot_summed_times(tasks_boxplot, figname_suffix,
     import numpy as np
     import matplotlib.pyplot as plt
 
-    data_ll = [val for _key, val in tasks_boxplot.iteritems()]
-    task_names = [key for key, _val in tasks_boxplot.iteritems()]
+    data_ll = [val for _key, val in tasks_boxplot.items()]
+    task_names = [key for key, _val in tasks_boxplot.items()]
     print(' *** got task_names: {}'.format(task_names))
 
 
@@ -1545,7 +1547,7 @@ def do_task_runtime_per_pl_stg_plots(infos, name_suffix, task='flagdata'):
     outname = 'task_{0}_per_pipeline_stage_boxplot_runtimes'.format(task)
     gen_tasks_boxplots(runtime_per_stage_indiv, 'full_pl',
                        ylabel_txt='Runtime (h)',
-                       plot_title_txt= 'Runtime of {0} split by pipeline stage'.
+                       plot_title_txt= 'Runtime of {0}, split by pipeline stage'.
                        format(task),
                        max_tasks=40,
                        figname_base=outname)
@@ -1582,9 +1584,12 @@ def do_tasks_stats_plots(infos, name_suffix):
                                                              total * 100)
 
 
-    gen_tasks_boxplots(tasks_full_times, 'full_pl_{0}'.format(name_suffix))
-    gen_tasks_boxplots(tasks_calib_times, 'calib_pl_{0}'.format(name_suffix))
-    gen_tasks_boxplots(tasks_imaging_times, 'imaging_pl_{0}'.format(name_suffix))
+    gen_tasks_boxplots(tasks_full_times, 'full_pl_{0}'.format(name_suffix),
+                       plot_title_txt ='Tasks stats - including all stages')
+    gen_tasks_boxplots(tasks_calib_times, 'calib_pl_{0}'.format(name_suffix),
+                       plot_title_txt ='Tasks stats - including only calibration stages')
+    gen_tasks_boxplots(tasks_imaging_times, 'imaging_pl_{0}'.format(name_suffix),
+                       plot_title_txt ='Tasks stats - including only imaging stages')
 
 def gen_tasks_boxplots(tasks_boxplot, figname_suffix, max_tasks = 10,
                        ylabel_txt='Percentage of total time in CASA tasks',
@@ -1598,9 +1603,9 @@ def gen_tasks_boxplots(tasks_boxplot, figname_suffix, max_tasks = 10,
     # useful?
     # items_ll = map(list, tasks_full_times.items())
     #data_ll = map(list, tasks_full_times.values())
-    data_ll = [val for _key, val in tasks_boxplot.iteritems()]
+    data_ll = [val for _key, val in tasks_boxplot.items()]
     #task_names = map(list, tasks_full_times.keys())
-    task_names = [key for key, _val in tasks_boxplot.iteritems()]
+    task_names = [key for key, _val in tasks_boxplot.items()]
 
     fig = plt.figure(figsize=(12,8))
     ax = fig.add_subplot(1,1,1)
@@ -1922,7 +1927,7 @@ def plot_multicore_list_runs(run_infos, metric_lambdas,
 
     gen_csv_multicore_list_run(num_servers, sum_val, mous_short_names[mous], mous, ptype)
     
-    fig.suptitle('{0}, MOUS: {1}, ASDM size: {2} GB'.
+    fig.suptitle('{0}, MOUS: {1}, ASDM size: {2:.1f} GB'.
                  format(mous_short_names[mous], mous, mous_sizes[mous]),
                  fontsize=FONTSIZE_TITLE, fontweight='bold')
     fig.savefig('plot_bars_runtime_{0}_parallel_multiple_cores_MOUS_{1}_{2}.png'.
@@ -2110,47 +2115,439 @@ def print_total_runtimes(serial_infos, parallel_infos):
     par_runtimes = get_total_runtimes_h(parallel_infos)
     print(" Dict of total runtimes, parallel mode: {0}".format(par_runtimes))
 
-    def print_html_summary(serial_infos, parallel_infos):
-        def gen_runtime_sum_section():
-            f_total = 'plot_runtime_serial_vs_parallel__totals_CASA_tasks_total.png'
-            f_calib = 'plot_runtime_serial_vs_parallel__section__Calibration_pipeline.png'
-            f_img = 'plot_runtime_serial_vs_parallel__section__Imaging_pipeline.png'
+def print_html_summary(serial_infos, parallel_infos):
+    import os
 
+    subdir_per_run = 'per_run'
+    doc_hdr = ('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"\n'
+               '"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">\n')
+
+    # TODO: remove - old serial/parallel stuff
+    def gen_runtime_sum_section():
+        f_total = 'plot_runtime_serial_vs_parallel__totals_CASA_tasks_total.png'
+        # f_calib = 'plot_runtime_serial_vs_parallel__section__Calibration_pipeline.png'
+        # f_img = 'plot_runtime_serial_vs_parallel__section__Imaging_pipeline.png'
+        txt = ''
+        if os.path.isfile(f_total) and os.access(f_total, os.R_OK):
             plot_img_pattern = '<a href="{0}"><img src={0} width="50%"/></a>\n'
-            if os.path.isfile(f_total) and os.access(f_total, os.R_OK):
-                txt = '<p>Full pipeline</p>'
-                txt += plot_img_pattern.format(f_total)
-                txt += '<p>Imaging and calibration</p>'
-                txt += '<table><tr>'
-                txt += '<td>'
-                txt += plot_img_pattern.format(f_calib)
-                txt += '</td>'
-                txt += '<td>'
-                txt += plot_img_pattern.format(f_img)
-                txt += '</td>'
-                txt += '</tr></table>'
-                return txt
+            txt = '<p>Full pipeline</p>'
+            txt += plot_img_pattern.format(f_total)
+            txt += '<p>Imaging and calibration</p>'
+            txt += '<table><tr>'
+            txt += '<td>'
+            txt += plot_img_pattern.format(f_calib)
+            txt += '</td>'
+            txt += '<td>'
+            txt += plot_img_pattern.format(f_img)
+            txt += '</td>'
+            txt += '</tr></table>'
 
-        import os
+        return txt
 
-        title = 'Results from ALMA pipeline test runs'
-        html = '<head><title>{0}</title></head>'.format(title)
-        html += '<body>'
-        html += '<h1>{0}</h1>'.format(title)
+    def gen_overall_histograms():
+        histo_runtimes = 'plot_pipeline_test_datasets_histo_runtimes_parallel.png'
+        histo_sizes = 'plot_pipeline_test_datasets_histo_sizes.png'
+        res = '<p>'
+        res += '<a href="{0}"><img width="40%" src="{0}"/></a>'.format(histo_runtimes)
+        res += '<a href="{0}"><img width="40%" src="{0}"/></a>'.format(histo_sizes)
+        res += '</p>\n'
+        # html += '<table class="datasets-tbl">\n<tbody>\n'
+        # html += ('<tr>'
+        #          '</tr>'
+        #          )
+
+        # ===> Summed runtimes of pipeline stages and CASA tasks
+        # ===> Overall CASA tasks statistics
+        # ===> Advanced/Experimental plots
+
+        # res += '</tbody>\n</table>\n'
+
+        subpage_summed = 'foo'
+        subpage_overall_stats = 'foo'
+        subpage_adv = 'foo'
+
+        # res += '<div width="30%" style="float:left;">'
+        # html = '<table class="datasets-tbl">\n<thead>\n'
+        # html += ('<tr>'
+        #          '<th><a href="{}">===> Summed runtimes of pipeline stages and CASA tasks</a></th>'
+        #          '<th><a href="{}">===> Overall CASA tasks statistics</a></th>'
+        #          '<th><a href="{}">===> Advanced/Experimental plots</a></th>'
+        #          '</tr>\n'
+        #          '</thead>\n'
+        #          '</table>'.format(subpage_summed, subpage_overall_stats, subpage_adv)
+        #          )
+        # res += html
+        # res += '</div>'
+
+        return res
+
+    def indiv_run_subpage_name(info):
+        run_name = 'performance_{}.html'.format(info['_mous'])
+        return os.path.join(subdir_per_run, run_name)
+
+    def gen_subpage_overall_casa_stats():
+        """ returns the name of the page produced """
+
+        oname = 'overall_casa_stats.html'
+        res = doc_hdr + '<html><head>\n'
+        title = 'Overall CASA tasks statistics, as box plots'
+        res += '<title>{}</title>'.format(title)
+        res += '</head>\n'
+        res += '<body>\n'
+        res += '<h1>{}</h1>\n'.format(title)
+        boxplot_full = 'tasks_overall_stats_boxplot_full_pl_parallel.png'
+        boxplot_calib = 'tasks_overall_stats_boxplot_calib_pl_parallel.png'
+        boxplot_img = 'tasks_overall_stats_boxplot_imaging_pl_parallel.png'
+        res += '<a href="{0}"><img src="{0}"/></a>'.format(boxplot_full)
+        res += '<hr/>'
+        res += '<a href="{0}"><img src="{0}"/></a>'.format(boxplot_calib)
+        res += '<hr/>'
+        res += '<a href="{0}"><img src="{0}"/></a>'.format(boxplot_img)
+        res += '<hr/>'
+        res += '</body>\n</html>'
+
+        with open(oname, "w+") as ofile:
+            ofile.write(res)
+
+        return oname
+
+    def gen_subpage_summed_stages_n_tasks():
+        """ returns the name of the page produced """
+
+        oname = 'summed_runtimes_pl_stages_n_casa_tasks.html'
+        res = doc_hdr + '<html><head>\n'
+        title = 'Summed runtimes of pipeline stages and CASA tasks'
+        res += '<title>{}</title>'.format(title)
+        res += '</head>\n'
+        res += '<body>\n'
+        res += '<h1>{}</h1>\n'.format(title)
+        stages = 'stages_pl_summed_runtime_barplot_runs_full_pl_parallel.png'
+        tasks_full = 'tasks_summed_runtime_barplot_runs_full_pl_parallel.png'
+        tasks_calib = 'tasks_summed_runtime_barplot_runs_calib_pl_parallel.png'
+        tasks_img = 'tasks_summed_runtime_barplot_runs_imaging_pl_parallel.png'
+        res += '<a href="{0}"><img src="{0}"/></a>'.format(stages)
+        res += '<hr/>'
+        res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_full)
+        res += '<hr/>'
+        res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_calib)
+        res += '<hr/>'
+        res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_img)
+        res += '<hr/>'
+        res += '</body>\n</html>'
+
+        with open(oname, "w+") as ofile:
+            ofile.write(res)
+
+        return oname
+
+    def gen_subpage_advanced_plots():
+        import glob
+        oname = 'advanced_plots.html'
+        # file names like:
+        # task_flagdata_per_pipeline_stage_summed_runtimes_runs_full_pl.png
+        # task_flagdata_per_pipeline_stage_boxplot_runtimes_full_pl.png
+        
+        try:
+            summed_plots = glob.glob('task_*_per_pipeline_stage_summed_runtimes_*.png')
+        except RuntimeError:
+            print('Warning, could not find plot "task_*_per_pipeline_stage_summed_runtimes')
+            summed_plots = ''
+
+        try:
+            box_plots = glob.glob('task_*_per_pipeline_stage_boxplot_runtimes_*.png')
+        except RuntimeError:
+            print('Warning, could not find plot "task_*_per_pipeline_stage_summed_runtimes')
+            box_plots = ''
+
+        title = 'Advanced or experimental plots - WIP'
+        res = doc_hdr + '<html><head>\n'
+        res += '<title></title>'.format(title)
+        if path_css:
+            res += '<link rel="stylesheet" type="text/css" href="{}">\n'.format(path_css)
+        res += '</head>\n'
+        res += '<body>\n'
+        res += '<h1>{}</h1>'.format(title)
+        res += ('The plots below show run times (total and box plot statistics) of '
+                'selected CASA tasks (tclean, flagdata, etc.), grouped by pipeilne stage')
+        for img in sorted(summed_plots):
+            res += '<a href="{0}"><img src="{0}"/></a>'.format(img)
+        res += '<hr/>'
+        for img in sorted(box_plots):
+            res += '<a href="{0}"><img src="{0}"/></a>'.format(img)
+        res += '</body>\n</html>'
+
+        with open(oname, "w+") as ofile:
+            ofile.write(res)
+        
+        return oname
+    
+    def format_pl_runtime(time_secs):
+        import datetime
+        SECS_PER_MIN = float(60.)
+        SECS_PER_HOUR = SECS_PER_MIN * 60.
+        SECS_PER_DAY = SECS_PER_HOUR * 24.
+        days = int(time_secs / SECS_PER_DAY)
+        remainder = time_secs
+        if days > 0:
+            remainder -= days * SECS_PER_DAY
+
+        hours = int(remainder / SECS_PER_HOUR)
+        if hours > 0:
+            remainder -= hours * SECS_PER_HOUR
+
+        minutes = int(remainder / SECS_PER_MIN)
+
+        res = ''
+        if days > 0:
+            res += '{0}d '.format(days)
+        # res += '{0:.2}h'.format(hours)
+        if hours > 0:
+            res += ' {0}h '.format(hours)
+        if minutes > 0:
+            res += ' {0}m '.format(minutes)
+        #print('days: {}, hours: {}'.format(days,hours))
+        return res
+
+    def find_stages_run(info):
+        stgs = info['_pipe_stages_counter']
+        stg_idx = sorted(stgs.keys(), key=lambda x: int(x))
+        stg_names = [info['_pipe_stages_counter'][key]['_equiv_call'] for key in stg_idx]
+        res = ''
+        if len(stgs) >= 20 and (
+                stg_names[0] == 'hifa_importdata' and
+                stg_names[1] == 'hifa_flagdata' and
+                stg_names[2] == 'hifa_fluxcalflag' and
+                stg_names[-1] == 'hifa_exportdata' and
+                'hifa_bandpassflag' in stg_names and
+                'hif_lowgainflag' in stg_names and
+                'hifa_timegaincal' in stg_names
+                ):
+            res = 'calibration'
+            if len(stgs) >= 34 and (
+                    'hif_findcont' in stg_names and
+                    'hif_uvcontfit' in stg_names and
+                    'hif_uvcontsub' in stg_names
+                    ):
+                res += ' + imaging'
+            res += ' ({} stages)'.format(len(info['_pipe_stages_counter']))
+        return res
+    
+    def gen_table_datasets(run_infos):
+        res = '<table class="datasets-tbl">\n<thead>\n'
+        res += ('<tr><th>Project</th> <th>MOUS</th> <th># EBs</th> <th>ASDM size (GB, total)</th> <th>start</th> '
+                '<th>runtime</th> <th>stages run</th> <th>CASA version</th> <th>machine</th>'
+                '<th>processes</th> </tr>')
+        res += '</thead>\n'
+        res += '<tbody>\n'
+        def sort_key_func(key_val):
+            return key_val[1]['_project_tstamp']
+        
+        for uid, info in sorted(run_infos.items(), key=sort_key_func):
+            res += '<tr>'
+            res += '<td>{}</td>'.format(info['_project_tstamp'].split('_')[0])
+            subpage_name = indiv_run_subpage_name(info)
+            res += '<td><a href="{0}">{1}</a></td>'.format(subpage_name, info['_mous'])
+            res += '<td>{0}</td>'.format(casa_logs_mous_props.ebs_cnt[uid])
+            res += '<td>{0:.1f}</td>'.format(get_asdms_size(uid))
+            res += '<td>{}</td>'.format(info['_first_tstamp'])
+            res += '<td>{}</td>'.format(format_pl_runtime(float(info['_total_time'])))
+            res += '<td>{}</td>'.format(find_stages_run(info))
+            res += '<td>{}</td>'.format(info['_casa_version'])
+            res += '<td>{}</td>'.format(info['_run_machine'])
+            res += '<td>{}</td>'.format(int(info['_mpi_servers'])+1)
+            res += '</tr>\n'
+
+        res += '</tbody>\n'
+        res += '</table>'
+        return res
+
+    def gen_per_run_pages(run_infos, path_css=None):
+        import glob
+
+        if not os.path.isdir(subdir_per_run):
+            os.mkdir(subdir_per_run)
+
+        for uid, info in sorted(run_infos.items()):
+            # Look for a plot named like:
+            # plot_pl_stages_tasks_other_barplot_E2E6.1.00038.S_MOUS_uid___A002_Xcff05c_X277_mpi_7.png
+            try:
+                barplot = glob.glob('plot_pl_stages_tasks_other_barplot_*_{}_*.png'.
+                                    format(info['_mous']))[0]
+            except (RuntimeError, IndexError):
+                print('Warning, could not find file with the bar plot of CASA tasks '
+                      'times in pipeilne stages, for MOUS: {}'.format(info['_mous']))
+                barplot = ''
+                
+            explanation = ('The bar chart below shows the time consumed by every pipeline '
+                           'stage (x axis), and within each stage the time consumed by '
+                           'different CASA tasks (colors).')
+
+            res = doc_hdr + '<html><head>\n'
+            res += ('<title>MOUS {0} - execution {1}</title>'.
+                    format(info['_mous'], info['_project_tstamp']))
+            if path_css:
+                res += '<link rel="stylesheet" type="text/css" href="{}">\n'.format(
+                    os.path.join('..', path_css))
+            res += '</head>\n'
+            res += '<body>\n'
+            # TODO: move these plot inside the subdirectory per_run/?
+            # TODO: add html-gen-function that takes the list of headers + list of values
+            res +='<table class="datasets-tbl">\n<thead>\n'
+            res += ('<tr>'
+                    '<th>CASA version</th>'
+                    '<th>Project</th> <th>MOUS</th>'
+                    '<th> # EBs</th> <th>Size of all ASDMs (GB)</th>'
+                    '<th>Total runtime</th> <th>Machine</th>'
+                    '</tr>\n'
+                    '</thead>\n'
+            )
+            mous = info['_mous']
+            res += ('<tbody>\n'
+                    '<tr> <td>{}</td>'
+                    '<td>{}</td> <td>{}</td>'
+                    '<td>{}</td> <td>{:.1f}</td>'
+                    '<td>{}</td> <td>{}</td>'
+                    '</tr>\n'.format(info['_casa_version'],
+                                     info['_project_tstamp'].split('_')[0], mous,
+                                     casa_logs_mous_props.ebs_cnt[mous],
+                                     get_asdms_size(mous),
+                                     format_pl_runtime(float(info['_total_time'])),
+                                     info['_run_machine'])
+            )
+            res += '</tbody>\n'
+            res += '</table>'
+
+            res += '<p>{}</p>'.format(explanation)
+            res += '<a href="{0}"><img src="{0}"/></a>'.format(
+                os.path.join('..', barplot))
+
+            res += '</body>\n</html>'
+            fname = indiv_run_subpage_name(info)
+            with open(fname, "w+") as ofile:
+                ofile.write(res)
+    
+    def cp_css():
+        import shutil
+        subdir = 'css'
+        fname = 'casa_log_info_plots.css'
+        if not os.path.isdir(subdir):
+            os.mkdir(subdir)
+        path_myself = os.path.dirname(os.path.abspath(__file__))
+        path_css = os.path.join(subdir, fname)
+        shutil.copyfile(os.path.join(path_myself, fname), path_css)
+        return path_css
+    
+    def gen_main_page(serial_infos, parallel_infos, path_css=None,
+                      outname='ALMA_pipeline_runs_performance_metrics.html'):
+        title = 'Performance metrics from ALMA pipeline runs'
+        html = doc_hdr + '<head>\n'
+        html += '<title>{0}</title>\n'.format(title)
+        if path_css:
+            html += '<link rel="stylesheet" type="text/css" href="{}">\n'.format(path_css)
+        html += '</head>\n'.format(title)
+        html += '<body>\n'
+        html += '<h1>{}</h1>\n'.format(title)
         html += '<p>'
-        html += ('Total datasets run: {0} (in serial mode: {1}, '
-                 'in parallel mode: {2}). Datasets info.\n'.
-                 format(len(serial_infos)+len(parallel_infos),
-                        len(serial_infos), len(parallel_infos)))
-        html += '</p>'
-        html += '<p>Run time</p>\n'
-        totals = gen_runtime_sum_section()
-        html += totals
-        html += '</body>'
+        html += ('These pages show statistics and plots for a set of pipeline/CASA '
+                 'runs that used different ALMA datasets.')
+        html+= '</p>\n'
 
-        f_out = 'ALMA_pipeline_test_runs_results.html'
-        with open(f_out, "w") as outf:
+        first_start = min([info['_first_tstamp'] for _key, info in parallel_infos.items()])
+        last_end = max([info['_last_tstamp'] for _key, info in parallel_infos.items()])
+        casa_versions = [info['_casa_version'] for _key, info in parallel_infos.items()]
+        machines = set([info['_run_machine'] for _key, info in parallel_infos.items()])
+
+        html +='<table class="datasets-tbl">\n<thead>\n'
+        html += ('<tr>'
+                 '<th>Total datasets</th>'
+                 '<th>First run started</th> <th>Last run ended</th>'
+                 '<th>Oldest CASA version used</th> <th>Newest CASA version used</th>'
+                 '<th>Number of different machines or nodes used</th>'
+                 '</tr>\n'
+                 '</thead>\n'
+        )
+        html += ('<tbody>\n'
+                 '<tr> <td>{}</td> <td>{}</td>'
+                 '<td>{}</td> <td>{}</td>'
+                 '<td>{}</td> <td>{}</td>'
+                 '</tr>\n'.format(len(serial_infos)+len(parallel_infos), first_start,
+                                  last_end, min(casa_versions), max(casa_versions),
+                                  len(machines)) 
+        )
+        html += '</table>\n'
+
+        html += '<h2>Datasets - runtime, input size</h2>\n'
+        overall_histos = gen_overall_histograms()
+
+        html += overall_histos
+        # html += overall_histos
+        # html += '\n<hr/>\n'
+        html += '<h2>Aggregated statistics:</h2>\n'
+        subpage_summed = gen_subpage_summed_stages_n_tasks()
+        subpage_overall_stats = gen_subpage_overall_casa_stats()
+        subpage_adv = gen_subpage_advanced_plots()
+        html += '<table class="links-tbl">\n<thead>\n'
+
+        to_summed = '<a href="{}">===> Summed runtimes of pipeline stages and CASA tasks</a>'.format(
+            subpage_summed)
+        to_overall = '<a href="{}">===> Overall CASA tasks statistics</a>'.format(
+            subpage_overall_stats)
+        to_adv = '<a href="{}">===> Advanced/Experimental plots</a>'.format(
+            subpage_adv)
+        html += ('<tr>'
+                 '<th>{}</th>'
+                 #'</tr><tr>'
+                 '<th>{}</th>'
+                 #'</tr><tr>'
+                 '<th>{}</th>'
+                 '</tr>\n'
+                 '</thead>\n'
+                 '</table>'.format(to_summed, to_overall, to_adv)
+                 )
+        # html += ('<div style="background-color: #DDEFDD; width: 100%">'
+        #          '<span width="30%">{}</span>'
+        #          '<span width="30%">{}</span>'
+        #          '<span width="30%">{}</span>'
+        #          '</div>'.format(to_summed, to_overall, to_adv)
+        # )
+        
+
+        
+        # html += ('<p><a href="{0}">===> Summed runtimes of pipeline stages and CASA tasks</a>'
+        #          '</p>\n'.format(subpage_summed))
+        # html += ('<p><a href="{0}">===> Overall CASA tasks statistics</a></p>\n'.
+        #          format(subpage_overall_stats))
+
+        # html += ('<p><a href="{0}">===> Advanced/Experimental plots</a></p>\n'.
+        #          format(subpage_adv))
+
+        # html += '<hr/>\n'
+        html += '<h2>Individual runs:</h2>\n'
+        html += gen_table_datasets(parallel_infos)
+
+        import platform
+        html += '\n<!-- auto-generated by {} on {}, tstamp: {} -->\n'.format(
+            os.path.basename(__file__), platform.node(), datetime.datetime.now())
+                                                                   
+        html += '</body>\n</html>'
+
+        with open(outname, "w") as outf:
             outf.write(html)
+            if not os.path.islink('index.html'):
+                os.symlink(outname, 'index.html')
+
+    path_css = cp_css()
+
+    gen_main_page(serial_infos, parallel_infos, path_css)
+    
+    gen_per_run_pages(parallel_infos, path_css)
+
+    # old seria/parallel stuff
+    # html += '\n<p>Run time</p>\n'
+    # totals = gen_runtime_sum_section()
+    # html += totals
+
+
 
 def plot_histo(data_val, bin_width, ticks_dist, xlabel, ylabel, title, filename):
     import numpy as np
@@ -2228,7 +2625,7 @@ def produce_datasets_histograms(serial_infos, parallel_infos):
     if len(sizes) > 0 and sum(sizes) > 0:
         plot_histo(sizes, bin_width=bin_width, ticks_dist=20, xlabel='ASDM sizes (GB)',
                    ylabel='Count of datasets (ASDMs)',
-                   title='Histogram of ASDM sizes of tests (bins: {0} GB)'.format(bin_width),
+                   title='Histogram of input ASDM sizes (bins: {0} GB)'.format(bin_width),
                    filename='plot_pipeline_test_datasets_histo_sizes.png')
 
     bin_width=4
@@ -2244,7 +2641,7 @@ def produce_datasets_histograms(serial_infos, parallel_infos):
     print('Plotting histo of parallel times: {0}'.format(times_par))
     plot_histo(times_par, bin_width=bin_width, ticks_dist=24, xlabel='Run time (hours)',
                ylabel='Count of datasets',
-               title='Histogram of pipeline run times (parallel mode) (bins: {0} hours)'.
+               title='Histogram of pipeline run times (bins: {0} hours)'.
                format(bin_width),
                filename='plot_pipeline_test_datasets_histo_runtimes_parallel.png')
 
@@ -2350,10 +2747,12 @@ def main_info_plotter(input_dir, make_general_plots=False,
 
     # This is for example for flagdata
     if make_task_per_pl_stage_plots:
-        if serial_infos:
-            do_task_runtime_per_pl_stg_plots(serial_infos, 'serial')
-        if parallel_infos:
-            do_task_runtime_per_pl_stg_plots(parallel_infos, 'serial')
+        tasks = ['flagdata', 'tclean']
+        for tsk in tasks:
+            if serial_infos:
+                do_task_runtime_per_pl_stg_plots(serial_infos, 'serial', task=tsk)
+            if parallel_infos:
+                do_task_runtime_per_pl_stg_plots(parallel_infos, 'parallel', task=tsk)
     # only this one:
     # do_serial_parallel_plot_pipe_tasks_functions(serial_infos, parallel_infos)
 
