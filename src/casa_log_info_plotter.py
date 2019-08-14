@@ -1360,13 +1360,11 @@ def plot_pl_stages_barplots(run_info, stages, stage_names,
         short_name = mous_short_names[mous]
     except KeyError:
         short_name = run_info['_project_tstamp'].split('_')[0]
-    try:
-        mous_size = mous_sizes[mous]
-    except KeyError:
-        mous_size = 'Unknown'
+
+    mous_size = get_asdms_size(mous)
 
     fig.suptitle('{0}, MOUS: {1}, ASDM size: {2:.1f} GB'.
-                 format(short_name, mous, mous_size),
+                 format(short_name, mous, float(mous_size)),
                  fontsize=FONTSIZE_TITLE, fontweight='bold')
     fig.savefig('{0}_{1}_MOUS_{2}_mpi_{3}.png'.
                 format(figname_base, short_name, mous, mpi),
@@ -1535,14 +1533,19 @@ def do_task_runtime_per_pl_stg_plots(infos, name_suffix, task='flagdata'):
     runtime_per_stage_indiv = {}
     for _key, run_info in infos.items():
         stgs_counter = run_info['_pipe_stages_counter']
-        obj = run_info['_casa_tasks_counter'][task]['_taccum_pipe_stages']
-        for stg_idx, stg_runtime in obj.items():
-            stg_name = stgs_counter[stg_idx]['_equiv_call']
-            runtime_per_stage.setdefault(stg_name, 0)
-            # TODO: SECS_TO_DAYS fix
-            runtime_per_stage[stg_name] += SECS_TO_DAYS * stg_runtime / SECS_TO_HOURS
-            runtime_per_stage_indiv.setdefault(stg_name, [])
-            runtime_per_stage_indiv[stg_name].append(stg_runtime / SECS_TO_HOURS)
+        try:
+            obj = run_info['_casa_tasks_counter'][task]['_taccum_pipe_stages']
+            for stg_idx, stg_runtime in obj.items():
+                stg_name = stgs_counter[stg_idx]['_equiv_call']
+                runtime_per_stage.setdefault(stg_name, 0)
+                # TODO: SECS_TO_DAYS fix
+                runtime_per_stage[stg_name] += SECS_TO_DAYS * stg_runtime / SECS_TO_HOURS
+                runtime_per_stage_indiv.setdefault(stg_name, [])
+                runtime_per_stage_indiv[stg_name].append(stg_runtime / SECS_TO_HOURS)
+        except KeyError as exc:
+            print('* WRANING: it looks like task {} was not found for this dataset '
+                  '(Proj: {}, MOUS: {}. Exception: {}'.
+                  format(task, run_info['_project_tstamp'], run_info['_mous'], exc))
 
     outname = 'task_{0}_per_pipeline_stage_boxplot_runtimes'.format(task)
     gen_tasks_boxplots(runtime_per_stage_indiv, 'full_pl',
@@ -1556,7 +1559,7 @@ def do_task_runtime_per_pl_stg_plots(infos, name_suffix, task='flagdata'):
     gen_bar_plot_summed_times(runtime_per_stage, figname_suffix='full_pl',
                               figname_base='task_{0}_per_pipeline_stage_summed_runtimes'.
                               format(task),
-                              title_txt_long='Runtime of {0}, by pipeilne '
+                              title_txt_long='Runtime of {0}, by pipeline '
                               'stage. Total: {2:.1f} h. PL jobs: {1}. '
                               .format(task, len(infos), total_runtime),
                               ylabel_txt = 'Runtime (h)')
@@ -2268,7 +2271,7 @@ def print_html_summary(serial_infos, parallel_infos):
         res += '<body>\n'
         res += '<h1>{}</h1>'.format(title)
         res += ('The plots below show run times (total and box plot statistics) of '
-                'selected CASA tasks (tclean, flagdata, etc.), grouped by pipeilne stage')
+                'selected CASA tasks (tclean, flagdata, etc.), grouped by pipeline stage')
         for img in sorted(summed_plots):
             res += '<a href="{0}"><img src="{0}"/></a>'.format(img)
         res += '<hr/>'
@@ -2313,7 +2316,9 @@ def print_html_summary(serial_infos, parallel_infos):
         stg_idx = sorted(stgs.keys(), key=lambda x: int(x))
         stg_names = [info['_pipe_stages_counter'][key]['_equiv_call'] for key in stg_idx]
         res = ''
-        if len(stgs) >= 20 and (
+
+        def looks_like_calib(stg_names):
+            return (
                 stg_names[0] == 'hifa_importdata' and
                 stg_names[1] == 'hifa_flagdata' and
                 stg_names[2] == 'hifa_fluxcalflag' and
@@ -2321,15 +2326,30 @@ def print_html_summary(serial_infos, parallel_infos):
                 'hifa_bandpassflag' in stg_names and
                 'hif_lowgainflag' in stg_names and
                 'hifa_timegaincal' in stg_names
-                ):
+            )
+
+        def looks_like_imaging(stg_names):
+            """ 
+            :param stg_names: list of stages names, ordered by run order 
+            """
+            return (
+                stg_names[0] == 'hif_mstransform' and
+                stg_names[-1] == 'hifa_exportdata' and
+                'hif_findcont' in stg_names and
+                'hif_uvcontfit' in stg_names and
+                'hif_uvcontsub' in stg_names
+            )
+        
+        if len(stgs) >= 20 and looks_like_calib(stg_names):
             res = 'calibration'
-            if len(stgs) >= 34 and (
-                    'hif_findcont' in stg_names and
-                    'hif_uvcontfit' in stg_names and
-                    'hif_uvcontsub' in stg_names
-                    ):
+            if len(stgs) >= 34 and looks_like_imaging(stg_names):
                 res += ' + imaging'
-            res += ' ({} stages)'.format(len(info['_pipe_stages_counter']))
+
+        elif len(stgs) >= 12 and looks_like_imaging(stg_names):  # 14+1 presently
+            res = 'imaging'
+            
+        res += ' ({} stages)'.format(len(info['_pipe_stages_counter']))
+
         return res
     
     def gen_table_datasets(run_infos):
@@ -2347,7 +2367,7 @@ def print_html_summary(serial_infos, parallel_infos):
             res += '<td>{}</td>'.format(info['_project_tstamp'].split('_')[0])
             subpage_name = indiv_run_subpage_name(info)
             res += '<td><a href="{0}">{1}</a></td>'.format(subpage_name, info['_mous'])
-            res += '<td>{0}</td>'.format(casa_logs_mous_props.ebs_cnt[uid])
+            res += '<td>{0}</td>'.format(casa_logs_mous_props.ebs_cnt.get(uid, 0))
             res += '<td>{0:.1f}</td>'.format(get_asdms_size(uid))
             res += '<td>{}</td>'.format(info['_first_tstamp'])
             res += '<td>{}</td>'.format(format_pl_runtime(float(info['_total_time'])))
@@ -2375,7 +2395,7 @@ def print_html_summary(serial_infos, parallel_infos):
                                     format(info['_mous']))[0]
             except (RuntimeError, IndexError):
                 print('Warning, could not find file with the bar plot of CASA tasks '
-                      'times in pipeilne stages, for MOUS: {}'.format(info['_mous']))
+                      'times in pipeline stages, for MOUS: {}'.format(info['_mous']))
                 barplot = ''
                 
             explanation = ('The bar chart below shows the time consumed by every pipeline '
@@ -2409,7 +2429,7 @@ def print_html_summary(serial_infos, parallel_infos):
                     '<td>{}</td> <td>{}</td>'
                     '</tr>\n'.format(info['_casa_version'],
                                      info['_project_tstamp'].split('_')[0], mous,
-                                     casa_logs_mous_props.ebs_cnt[mous],
+                                     casa_logs_mous_props.ebs_cnt.get(mous, 0),
                                      get_asdms_size(mous),
                                      format_pl_runtime(float(info['_total_time'])),
                                      info['_run_machine'])
