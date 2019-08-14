@@ -1,0 +1,39 @@
+h1, h2, h3, h4 {
+    font: bold Helvetica, sans-serif;
+}
+
+p {
+    font: normal 16px Helvetica, sans-serif;
+}
+
+.datasets-tbl {
+    border: solid 1px #DDEFDD;
+    border-collapse: collapse;
+    border-spacing: 0;
+    font: normal 16px Helvetica, sans-serif;
+}
+.datasets-tbl thead th {
+    background-color: #DDEFDD;
+    border: solid 1px #DDEFDD;
+    color: #000000;
+    padding: 10px;
+    text-align: left;
+    text-shadow: 1px 1px 1px #fff;
+    font-weight: bold;
+}
+.datasets-tbl tbody td {
+    border: solid 1px #DDEFDD;
+    color: #000000;
+    padding: 10px;
+    text-shadow: 1px 1px 1px #fff;
+    text-align: right;
+}
+
+.datasets-tbl tr:nth-child(even) {
+    background-color: #EFEFEF;
+}
+
+.links-tbl {
+    background-color: #DDEFDD;
+    width: 80%;
+}
