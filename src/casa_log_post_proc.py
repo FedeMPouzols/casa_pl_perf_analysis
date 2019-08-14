@@ -69,7 +69,10 @@ class CASALogInfo(object):
         short_dataset_id = ''
         try:
             from casa_logs_mous_props import mous_short_names
-            short_dataset_id = mous_short_names[self._mous]
+            try:
+                short_dataset_id = mous_short_names[self._mous]
+            except KeyError:
+                short_dataset_id = 'no_short_name_' + str(self._project_tstamp)
         except ImportError:
             pass
 
@@ -99,6 +102,7 @@ class CASALogInfo(object):
             result += '_proj_' + self._project_tstamp
 
         return result
+
 
 class PipeStageCounter(object):
     """
@@ -171,6 +175,18 @@ class CASATaskDetails(object):
         self._runtime = 0
         self._params = params
         self._further_info = {}
+
+def version_equal_or_after(vers_str, major, minor, patch):
+    """" 
+    usage: version_equal_or_after(5,4,0) to know if it was >= 5.4.0
+    """
+    vers = vers_str.split('.')
+    if len(vers) != 3:
+        raise RuntimeError('Cannot parse CASA version: {0}'.format(vers_str))
+
+    return (vers[0] > major or 
+            vers[0] == major and vers[1] > minor or
+            vers[0] == major and vers[1] == minor and vers[2] >= patch)
 
 def get_ranked_dict_by_taccum(dict_taccum):
     """
@@ -467,8 +483,8 @@ def make_table_file(out_fname, run_infos, rows, columns, cell_texts,
         # TODO: PDF table size
         #fig = plt.figure(figsize=(116.9, 82.7), dpi=300)
         #fig.set_size_inches(116.9, 82.7)
-        fig = plt.figure(figsize=(11.69, 8.27), dpi=300)
-        fig.set_size_inches(11.69, 8.27)
+        fig = plt.figure(figsize=(11.69, 4*8.27), dpi=300)
+        fig.set_size_inches(11.69, 4*8.27)
     else:
         fig = plt.figure(figsize=(8.27, 11.69), dpi=300)
         fig.set_size_inches(8.27, 11.69)
@@ -480,7 +496,7 @@ def make_table_file(out_fname, run_infos, rows, columns, cell_texts,
     fig.suptitle(title, fontsize=fontsize, x=0.05, horizontalalignment='left')
 
     if not portrait:
-        tbl_bbox = [0.1, 0, 1, 1]
+        tbl_bbox = [0.5, 0, 1, 1]
     else:
         # left x needs space for lengthy names
         tbl_bbox = [0.33, 0, 0.85, 1]
@@ -809,6 +825,10 @@ def go_through_log_lines(logf):
 
     stop_counting_after_pipe_end = True
     stop_counting_minimum_pipe_stage = 33
+
+    # Before this, the 'equiv call: ...' line used to be printed before the 
+    # stage xx start line. With >= 5.4.0, it is printed after.
+    casa_version_equiv_call_change = [5, 4, 0]
 
     # Example log line:
     # 2017-07-18 17:13:26	INFO	::casa::MPIServer-1	CASA Version 5.1.0-1
@@ -1159,6 +1179,7 @@ def go_through_log_lines(logf):
                     else:
                         pipe_tier_nestedness -= 1
 
+
         # To know what's the current 'equivalent CASA call'
         # Looking for example for:
         # 2017-10-05 12:51:50     INFO    hifa_importdata::pipeline.infrastructure.basetask::@cvpost065:MPIClient Equivalent CASA call: hifa_importdata(vis=['uid___A002_Xc3412f_X31e1'], session=['session_1'])
@@ -1167,7 +1188,19 @@ def go_through_log_lines(logf):
         if stage_equiv_call_str in line and 'pipeline.infrastructure.basetask' in line:
             equiv_match = re.search(stage_equiv_call_re, line)
             if equiv_match:
-                pipe_stages_current_equiv_call = equiv_match.group(1)
+                equiv_call_str = equiv_match.group(1)
+                if not version_equal_or_after(casa_version,
+                                              *casa_version_equiv_call_change):
+                    pipe_stages_current_equiv_call = equiv_call_str
+                else:
+                    stage_cnt = pipe_stages_counter[pipe_stages_current]
+                    stage_cnt._equiv_call = equiv_call_str
+                    pipe_stages_counter.update({pipe_stages_current: stage_cnt})
+
+
+        # ********************** TODO
+        # TODO: Before CASA 5.4, the 'Equivalent CASA call' comes before 'Starting execution for stage'. After CASA 5.4 it comes after!
+        # if casa_5_4 -> the equiv_match needs to be assigned to the last stage added (pipe_stages_curren.... and below, it should not be taken from pipe_stages_current_equiv_call
 
         # Handle start/end of pipeline stages
         begin_stage_str = 'Starting execution for stage'
@@ -1184,9 +1217,11 @@ def go_through_log_lines(logf):
                         pipe_stages_counter.update({pipe_stages_current: cnt})
 
                     pipe_stages_current = stage_name
-                    new_stage_cnt = PipeStageCounter(stage_name,
-                                                     pipe_stages_current_equiv_call,
-                                                     tstamp)
+                    equiv_call = "not_yet_known"
+                    if not version_equal_or_after(casa_version, 
+                                                  *casa_version_equiv_call_change):
+                        equiv_call = pipe_stages_current_equiv_call
+                    new_stage_cnt = PipeStageCounter(stage_name, equiv_call, tstamp)
                     pipe_stages_counter[stage_name] = new_stage_cnt
 
         if stop_counting_after_pipe_end and\
@@ -1305,10 +1340,14 @@ def casa_log_file_print_info(all_cnt, all_taccum, log_info):
           format(all_taccum, pipe_taccum, pipe_infra_taccum, pipe_h_taccum,
                  pipe_hif_taccum, pipe_hifa_taccum, pipe_recipereducer_taccum,
                  pipe_qa_taccum))
+
     task_imageparams = 'hif.heuristics.imageparams_base'
-    print("Accum time, pipeline.{0}: {1}".
-          format(task_imageparams,
-                 pipe_tasks_counter[task_imageparams]._taccum))
+    try:
+        cnt = pipe_tasks_counter[task_imageparams]._taccum
+        print("Accum time, pipeline.{0}: {1}".
+              format(task_imageparams, cnt))
+    except KeyError:
+        pass
 
     total_tdelta = datetime.timedelta(seconds=log_info._total_time)
     elapsed_tbl_format = format_tbl_elapsed(total_tdelta)
@@ -1381,6 +1420,10 @@ def process_casa_logs(log_fnames, make_plots=False, make_tables=False):
     functions that generate plots, tables, etc. for comparative analysis
     of test runs.
     """
+
+    import time
+    time_start = time.time()
+
     print(' * ===========================================')
     print(' * Log files: {0}'.format(log_fnames))
     print(' * Produce tables? {0}'.format(make_tables))
@@ -1394,13 +1437,16 @@ def process_casa_logs(log_fnames, make_plots=False, make_tables=False):
         print(' * Processing log file: {0}'.format(fname))
         log_info = parse_casa_log_file_print_info(fname, print_info=True)
         run_infos.append(log_info)
-        print ('')
 
     if make_plots:
         plot_timing_things(run_infos)
 
     if make_tables:
         generate_comparison_table(run_infos)
+
+    time_end = time.time()
+    print(" * Processed log(s) in seconds: {0:.3f}".format(time_end - time_start))
+    print ('')
 
 def main():
     import argparse
