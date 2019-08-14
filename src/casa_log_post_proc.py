@@ -5,6 +5,7 @@ import re
 
 verbose = False
 
+
 class CASALogInfo(object):
     """
     General run information, timings and other statistics extracted from a CASA run log,
@@ -72,8 +73,8 @@ class CASALogInfo(object):
                 from casa_logs_mous_props import mous_short_names
                 short_dataset_id = mous_short_names[self._mous]
             except (ImportError, KeyError):
-                if not '_' in self._project_tstamp:
-                    raise RuntimeError('Cannot find expected _ in project name: {}. Giging'
+                if '_' not in self._project_tstamp:
+                    raise RuntimeError('Cannot find expected _ in project name: {}. Giving'
                                        ' up'.format(self._project_tstamp))
                 short_dataset_id = self._project_tstamp.split('_')[0]
         except ImportError:
@@ -123,12 +124,15 @@ class PipeStageCounter(object):
         self._end_t = tstamp
         self._taccum = (tstamp - self._start_t).total_seconds()
 
+
 PIPE_FIRST_IMAGING_STAGE = 23
 PIPE_LAST_STAGE = 36
+
+
 class CASATaskAggLogInfo(object):
     """
     Aggregated info for a CASA task extracted from a CASA log file.
-    This accumulates info for all the calls to a given casa task, 
+    This accumulates info for all the calls to a given casa task,
     identified by its name, for example tclean, flagdata, etc.
     """
     def __init__(self, name):
@@ -159,11 +163,13 @@ class CASATaskAggLogInfo(object):
         else:
             self._taccum_calib_1_22 += task_runtime
 
+
 class CommonBeamInfo(object):
     def __init__(self, major, minor, pa):
         self._major = major
         self._minor = minor
         self._pa = pa
+
 
 class CASATaskDetails(object):
     """
@@ -180,17 +186,19 @@ class CASATaskDetails(object):
         self._params = params
         self._further_info = {}
 
+
 def version_equal_or_after(vers_str, major, minor, patch):
-    """" 
+    """"
     usage: version_equal_or_after(5,4,0) to know if it was >= 5.4.0
     """
     vers = vers_str.split('.')
     if len(vers) != 3:
         raise RuntimeError('Cannot parse CASA version: {0}'.format(vers_str))
 
-    return (vers[0] > major or 
+    return (vers[0] > major or
             vers[0] == major and vers[1] > minor or
             vers[0] == major and vers[1] == minor and vers[2] >= patch)
+
 
 def get_ranked_dict_by_taccum(dict_taccum):
     """
@@ -202,6 +210,7 @@ def get_ranked_dict_by_taccum(dict_taccum):
     import operator
     ranked = sorted(dict_taccum.values(), key=operator.attrgetter('_taccum'), reverse=True)
     return ranked
+
 
 def print_ranked_pipe_tasks_counter(ptc):
     sorted_ptc = get_ranked_dict_by_taccum(ptc)
@@ -218,6 +227,7 @@ def print_ranked_pipe_tasks_counter(ptc):
                                               pc_accum))
     print('---------------------------')
 
+
 def print_ranked_pipe_stages_counter(psc):
     sorted_psc = get_ranked_dict_by_taccum(psc)
     print('---------------------------')
@@ -225,7 +235,7 @@ def print_ranked_pipe_stages_counter(psc):
         print('{0}, {1}, {2}'.format(val._name, val._equiv_call, val._taccum))
     print('---------------------------')
 
-    
+
 def format_tbl_elapsed(elapsed):
     days = elapsed.days
     rem_seconds = elapsed.seconds
@@ -243,6 +253,7 @@ def format_tbl_elapsed(elapsed):
         return ('{0}d {1}'.
                 format(days, subday_str))
 
+
 def get_ranked_list_from_dict(ind, reverse_order=True, rank_by_key=False):
     import operator
     if rank_by_key:
@@ -253,11 +264,12 @@ def get_ranked_list_from_dict(ind, reverse_order=True, rank_by_key=False):
                       reverse=reverse_order)
     return sorted_d
 
+
 def print_ranked_dict(ind):
-    sorted_d = get_ranked_list_from_dict(ind)   
+    sorted_d = get_ranked_list_from_dict(ind)
     totals_dict = sum(ind.values())
 
-    for k,v in sorted_d:
+    for k, v in sorted_d:
         print("{0}{1}: {2} ({3:.4g}%)".format('   ', v, k, v/totals_dict*100.0))
 
     return sorted_d
@@ -277,12 +289,13 @@ def plot_tasks_pie_chart(axis, ranking):
              shadow=True, colors=colors) # explode=explode, startangle=90
     axis.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
 
+
 def plot_tasks_bar(axis, ranking):
     import matplotlib.cm as cm
 
     ranking.reverse()   # Put bigger ones at the bottom
     labels = [task[0] for task in ranking]
-    sizes = [task[1] for task in ranking]    
+    sizes = [task[1] for task in ranking]
     axis.bar(0, sizes[0], label=labels[0], bottom=0) #, color=colors[0])
     #axis.bar(1, sizes[0]) #, color=colors[0])
     axis.bar(1, 0)
@@ -304,6 +317,7 @@ def plot_tasks_bar(axis, ranking):
     axis.legend(handles[::-1], labels[::-1], title='Tasks', loc='best')
     axis.set_ylabel('time (s)')
 
+
 def plot_timing_things(run_infos):
     import matplotlib
     matplotlib.use('Agg')
@@ -312,7 +326,7 @@ def plot_timing_things(run_infos):
     # TODO
     ranking = get_ranked_list_from_dict(run_infos[0]._task_time_accum)
 
-    fig = plt.figure(figsize=(8,16))
+    fig = plt.figure(figsize=(8, 16))
     # ax_top = fig.add_subplot(211)
     ax_top = plt.subplot2grid((1, 3), (0, 0), colspan=2)
     plot_tasks_pie_chart(ax_top, ranking)
@@ -321,7 +335,6 @@ def plot_timing_things(run_infos):
     plot_tasks_bar(ax_bottom, ranking)
     plt.tight_layout()
 
-    
     fig_fname = ('casa_logs_tasks_timing_barplot_MOUS_{0}.png'.
                  format(run_infos[-1].build_filename_extended_tags()))
     fig.savefig(fig_fname, transparent=False)
@@ -331,18 +344,20 @@ def plot_timing_things(run_infos):
     if show_plots:
         plt.show()
 
+
 def prepare_colors_rows(rows, len_cols):
     colors_rows = []
     colors_cells = []
     for idx, row in enumerate(rows):
         if 0 == (idx % 2):
             colors_rows.append('white')
-            colors_cells.append( ['white'] * len_cols)
+            colors_cells.append(['white'] * len_cols)
         else:
             colors_rows.append('lightgrey')
-            colors_cells.append( ['lightgrey'] * len_cols)
+            colors_cells.append(['lightgrey'] * len_cols)
 
     return (colors_rows, colors_cells)
+
 
 def prepare_title_etc(run_infos):
     """
@@ -361,8 +376,7 @@ def prepare_title_etc(run_infos):
                   format(run_type, rinfo._run_machine, rinfo._first_tstamp,
                          rinfo._last_tstamp, rinfo._casa_version))
         time_others = rinfo._total_time - rinfo._total_time_casa_tasks
-        
-    
+
     # This goes in the general CASA tasks table. Not sure if also useful here.
     # x_loc_info = -0.08
     # y_loc_info = -0.055
@@ -371,6 +385,7 @@ def prepare_title_etc(run_infos):
     #          horizontalalignment='left', verticalalignment='center',
     #          transform = ax.transAxes, fontsize=11)
     return title
+
 
 def make_casa_tasks_table_file(out_fname, run_infos, rows, columns, cell_texts):
     import matplotlib
@@ -395,7 +410,7 @@ def make_casa_tasks_table_file(out_fname, run_infos, rows, columns, cell_texts):
     info_text = ('Run type:\ntotal time:\ntime CASA tasks:\ntime other:')
     plt.text(x_loc_info, y_loc_info, info_text,
              horizontalalignment='left', verticalalignment='center',
-             transform = ax.transAxes, fontsize=11)
+             transform=ax.transAxes, fontsize=11)
 
     time_others_ref = datetime.timedelta(seconds=(run_infos[0]._total_time -
                                                   run_infos[0]._total_time_casa_tasks))
@@ -403,7 +418,7 @@ def make_casa_tasks_table_file(out_fname, run_infos, rows, columns, cell_texts):
         if rinfo._mpi_servers > 0:
             run_type = 'parallel ({0})'.format(rinfo._mpi_servers + 1)
         else:
-            run_type = 'serial'       
+            run_type = 'serial'
 
         title += ('\n- {0}: run on {1}, started {2}, finished: {3}. CASA {4}'.
                   format(run_type, rinfo._run_machine, rinfo._first_tstamp,
@@ -429,14 +444,13 @@ def make_casa_tasks_table_file(out_fname, run_infos, rows, columns, cell_texts):
                                 time_others,
                                 float(time_others.total_seconds()) /
                                 time_others_ref.total_seconds()))
-        
+
         plt.text(x_loc_info+0.3*(idx+1), y_loc_info, info_text,
                  horizontalalignment='left', verticalalignment='center',
                  transform = ax.transAxes, fontsize=11)
 
     fig.suptitle(title, fontsize=11, x=0.08, horizontalalignment='left')
 
-    
     tbl = ax.table(cellText=cell_texts, rowLabels=rows, colLabels=columns,
                    rowColours=colors_rows, cellColours=colors_cells,
                    bbox=[0.05, 0, 1, 1],
@@ -452,7 +466,6 @@ def make_casa_tasks_table_file(out_fname, run_infos, rows, columns, cell_texts):
         for row_idx in range(0, cell_texts.shape[0] + 1):
             cellDict[(row_idx, col_idx)].set_width(0.12)
 
-    
     tbl.set_fontsize(11)
 
     # plt.show()
@@ -485,14 +498,14 @@ def make_table_file(out_fname, run_infos, rows, columns, cell_texts,
 
     if not portrait:
         # TODO: PDF table size
-        #fig = plt.figure(figsize=(116.9, 82.7), dpi=300)
-        #fig.set_size_inches(116.9, 82.7)
+        # fig = plt.figure(figsize=(116.9, 82.7), dpi=300)
+        # fig.set_size_inches(116.9, 82.7)
         fig = plt.figure(figsize=(11.69, 4*8.27), dpi=300)
         fig.set_size_inches(11.69, 4*8.27)
     else:
         fig = plt.figure(figsize=(8.27, 11.69), dpi=300)
         fig.set_size_inches(8.27, 11.69)
-        
+
     ax = fig.add_subplot(1, 1, 1)
     fig.patch.set_visible(False)
     ax.axis('off')
@@ -517,11 +530,13 @@ def make_table_file(out_fname, run_infos, rows, columns, cell_texts,
     # plt.show()
     fig.savefig(out_fname, transparent=True)
 
+
 def generate_comparison_table(run_infos):
 
     generate_comparison_table_CASA_tasks(run_infos)
     generate_comparison_table_pipeline_stages(run_infos)
     generate_comparison_table_pipeline_tasks_etc(run_infos)
+
 
 def get_run_type_str(run_info):
     if run_info._mpi_servers > 0:
@@ -529,7 +544,8 @@ def get_run_type_str(run_info):
     else:
         run_type = 'serial'
     return run_type
-    
+
+
 def generate_comparison_table_pipeline_stages(run_infos):
     """
     Print: stage#, stage_call; then for every run: time
@@ -576,10 +592,10 @@ def generate_comparison_table_pipeline_stages(run_infos):
                                                               100 *
                                                               this_time.total_seconds() /
                                                               sum_time.total_seconds())
-    
+
     make_table_file(table_fname, run_infos, rows, cols, values, portrait=False)
     print(' * Produced table of pipeline stages: {0}'.format(table_fname))
-    
+
 
 def generate_comparison_table_pipeline_tasks_etc(run_infos):
     """
@@ -620,7 +636,7 @@ def generate_comparison_table_pipeline_tasks_etc(run_infos):
             ranked_tasks[idx] = ranked_tasks[idx][0:MAX_ROWS]
     # Base row names on the ranking of the first run
     rows = ['{0}'.format(task._name) for task in ranked_tasks[0]]
-    
+
     values = np.ndarray((len(rows), len(cols)), dtype='object')
     for col_idx in range(0, values.shape[1]):
         ranking = ranked_tasks[col_idx]
@@ -648,7 +664,7 @@ def generate_comparison_table_pipeline_tasks_etc(run_infos):
     make_table_file(table_fname, run_infos, rows, cols, values, fontsize=6, portrait=True)
     print(' * Produced table of pipeline tasks, heuristics, etc.: {0}'.format(table_fname))
 
-    
+
 def generate_comparison_table_CASA_tasks(run_infos_orig):
     """
     Needs cleaning after too many changes to tables.
@@ -656,7 +672,7 @@ def generate_comparison_table_CASA_tasks(run_infos_orig):
     import numpy as np
 
     # horrible, if only one log given, duplicate it.
-    if 1==len(run_infos_orig):
+    if 1 == len(run_infos_orig):
         run_infos = [run_infos_orig[0], run_infos_orig[0]]
     else:
         run_infos = run_infos_orig
@@ -712,7 +728,7 @@ def generate_comparison_table_CASA_tasks(run_infos_orig):
             ratio_col = 0
         else:
             ratio_col = float(taccum_serial) / float(taccum_par)
-        # Time converted to int, as the logs have s precision.    
+        # Time converted to int, as the logs have s precision.
         values[row_idx, :] = np.array([str(tcalls_serial),
                                        "{:d} ({:.3g})".format(int(taccum_serial),
                                                                 serial_col),
@@ -720,7 +736,7 @@ def generate_comparison_table_CASA_tasks(run_infos_orig):
                                        "{:d} ({:.3g})".format(int(taccum_par),
                                                                 par_col),
                                        "{:.3g}".format(ratio_col)])
-    
+
     table_fname = ('casa_logs_CASA_tasks_timing_table_MOUS_{0}.pdf'.
                    format(run_infos[-1].build_filename_extended_tags()))
     make_casa_tasks_table_file(table_fname, run_infos, rows, cols, values)
@@ -728,6 +744,7 @@ def generate_comparison_table_CASA_tasks(run_infos_orig):
 
 
 CASA_TSTAMP_STRFTIME = '%Y-%m-%d %H:%M:%S'
+
 
 def correct_casa_log_datetime(dt_str):
     """
@@ -751,6 +768,7 @@ def correct_casa_log_datetime(dt_str):
         norm_dt_str = next_day_00.strftime(CASA_TSTAMP_STRFTIME)
 
     return norm_dt_str
+
 
 def get_timestamp_from_casa_log_line(line):
     log_date_time_re = '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
@@ -830,7 +848,7 @@ def go_through_log_lines(logf):
     stop_counting_after_pipe_end = True
     stop_counting_minimum_pipe_stage = 33
 
-    # Before this, the 'equiv call: ...' line used to be printed before the 
+    # Before this, the 'equiv call: ...' line used to be printed before the
     # stage xx start line. With >= 5.4.0, it is printed after.
     casa_version_equiv_call_change = [5, 4, 0]
 
@@ -884,7 +902,7 @@ def go_through_log_lines(logf):
             on parser libraries that might not be available on test machines and for example
             the standard Python distribution that comes with CASA.
 
-            The simplest safe trick to split the parameters is is by '=' 
+            The simplest safe trick to split the parameters is is by '='
             Note that ',' is both separator and content of some parameter values, and those
             parameter values can be enclosed in either quotes or square brackets, or both!
 
@@ -899,12 +917,12 @@ def go_through_log_lines(logf):
             par_names = []
             for found in re.finditer('([^\s]+)\s*=', params_str):
                 par_names.append(found.group(1))
-            
+
             for lhs in par_names:
                 # Match the name on the lhs up to a comma followed by another 'keyword=' (or
                 # end of line, for the last argument)
                 par_re = '{0}\s*=\s*(.+?)(,\s*[^\s]+=|$)'.format(lhs)
-                try: 
+                try:
                     par_match = re.search(par_re, params_str)
                 except re.error as exc:
                     print(' ***** Error when parsing task parameters. Setting empty '
@@ -937,7 +955,7 @@ def go_through_log_lines(logf):
                 tasks_details_params.append(details_params)
                 # to get its runtime later, when 'End Task' found
                 task_details_task_name = details_task_target
-        
+
         if 'pipeline.' in line:
             pipe_line_found = True
             pipe_cnt += 1
@@ -957,7 +975,7 @@ def go_through_log_lines(logf):
                 pipe_tasks_counter.update({name: tlb})
 
             # To get inside tools, etc. C++ level - use with care - very verbose output
-            # Recommended: False, unless you want to debug/get lots of lines 
+            # Recommended: False, unless you want to debug/get lots of lines
             count_specials = False
             if count_specials:
                 pipe_c_specials = ['pipeline.hif.heuristics.imageparams_base::Imager::open()',
@@ -983,7 +1001,7 @@ def go_through_log_lines(logf):
                     tlb._block_found_open = True
 
                     pipe_tasks_counter.update({csp: tlb})
-                
+
 
         for task_pattern in special_task_patterns:
             if task_pattern in line:
@@ -1042,7 +1060,7 @@ def go_through_log_lines(logf):
                 idx = re_match.group(1)
                 details._further_info['major_cycle_max'] = idx
                 tasks_details_params[-1] = details
-                
+
         # def identify_first_eb
         # Look for a line that contains something like:
         # hifa_importdata(vis=['uid___A002_Xb8e961_Xb0d', 'uid___A002_Xb8f857_X1176', 'uid___A002_Xb91513_X1936'], session=['default', 'default', 'default'])
@@ -1096,7 +1114,7 @@ def go_through_log_lines(logf):
         if 'CASA Version' in line and 'MPIServer' not in line:
             version_match = re.search(version_re, line)
             if version_match:
-                casa_version = version_match.group(1).strip()                    
+                casa_version = version_match.group(1).strip()
 
         # check mpi
         mpi_server_str = '::casa::MPIServer-'
@@ -1223,7 +1241,7 @@ def go_through_log_lines(logf):
 
                     pipe_stages_current = stage_name
                     equiv_call = "not_yet_known"
-                    if not version_equal_or_after(casa_version, 
+                    if not version_equal_or_after(casa_version,
                                                   *casa_version_equiv_call_change):
                         equiv_call = pipe_stages_current_equiv_call
                     new_stage_cnt = PipeStageCounter(stage_name, equiv_call, tstamp)
@@ -1239,7 +1257,7 @@ def go_through_log_lines(logf):
             # starting stage messages.
             pipe_stages_counter[pipe_stages_current].ends(tstamp)
             print(' * Found end of pipeline procedure: \'{0}\''
-                  ' --- Not counting log lines after this.'.format(line.strip()) )
+                  ' --- Not counting log lines after this.'.format(line.strip()))
             break
 
 
@@ -1259,6 +1277,7 @@ def go_through_log_lines(logf):
                        all_casa_tasks_accum)
 
     return (all_cnt, all_taccum, logi)
+
 
 def casa_log_file_print_info(all_cnt, all_taccum, log_info):
     pipe_tasks_counter = log_info._pipe_tasks_counter
@@ -1323,7 +1342,7 @@ def casa_log_file_print_info(all_cnt, all_taccum, log_info):
 
     def sum_runtimes_pipe_tasks(pattern):
         """
-        Sum times of all the pipeline tasks/heuristics/etc. with names containing a 
+        Sum times of all the pipeline tasks/heuristics/etc. with names containing a
         pattern, for example 'infrastructure.' or 'hifa.'
 
         :param pattern: pattern to filter pipeline tasks
@@ -1362,7 +1381,7 @@ def casa_log_file_print_info(all_cnt, all_taccum, log_info):
                  log_info._total_time))
     print(" - Total time in CASA tasks: {0} (in seconds: {1})".
           format(datetime.timedelta(seconds=log_info._total_time_casa_tasks),
-                 log_info._total_time_casa_tasks))        
+                 log_info._total_time_casa_tasks))
     print(" - Explicit pipeline time: {} (in seconds: {})".
           format(datetime.timedelta(seconds=pipe_taccum), pipe_taccum))
 
@@ -1377,7 +1396,7 @@ def casa_log_file_dump_to_json(filename, log_info):
         import datetime
         if isinstance(obj, datetime.datetime):
             return '{0}'.format(obj)
-        elif isinstance (obj, datetime.timedelta):
+        elif isinstance(obj, datetime.timedelta):
             return '{0}'.format(obj.total_seconds())
         else:
             return obj.__dict__
@@ -1391,6 +1410,7 @@ def casa_log_file_dump_to_pickle(filename, log_info):
 
     with open(filename, 'wb') as pklf:
         pickle.dump(log_info, pklf, protocol=pickle.HIGHEST_PROTOCOL)
+
 
 def casa_log_file_dump_info(log_info, json=True, pickle=True):
     """
@@ -1409,11 +1429,11 @@ def casa_log_file_dump_info(log_info, json=True, pickle=True):
         print(' * Dumping log info object into JSON file: {0}'.format(filename_json))
         casa_log_file_dump_to_json(filename_json, log_info)
 
-    
+
 def parse_casa_log_file_print_info(fname, print_info=True):
     import traceback
 
-    with open(fname) as logf:        
+    with open(fname) as logf:
         try:
             (all_cnt, all_taccum, log_info) = go_through_log_lines(logf)
         except Exception as exc:
@@ -1427,7 +1447,8 @@ def parse_casa_log_file_print_info(fname, print_info=True):
         casa_log_file_dump_info(log_info, pickle=False)
 
         return log_info
-        
+
+
 def process_casa_logs(log_fnames, make_plots=False, make_tables=False):
     """
     Gets an info object from a casa log file and passes the information on to
@@ -1466,6 +1487,7 @@ def process_casa_logs(log_fnames, make_plots=False, make_tables=False):
     print(" * Processed log(s) in seconds: {0:.3f}".format(time_end - time_start))
     print ('')
 
+
 def main():
     import argparse
 
@@ -1475,10 +1497,10 @@ def main():
                                      'tasks and stages ')
     parser.add_argument('--make-tables', action='store_true')
     parser.add_argument('--make-plots', action='store_true')
-    parser.add_argument('log_files', nargs='+', type=str, 
+    parser.add_argument('log_files', nargs='+', type=str,
                         help='names of the log files to process')
     args = parser.parse_args()
-        
+
     process_casa_logs(args.log_files, args.make_plots, args.make_tables)
 
 
