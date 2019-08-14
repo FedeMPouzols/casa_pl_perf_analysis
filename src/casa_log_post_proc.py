@@ -932,8 +932,8 @@ def go_through_log_lines(logf):
 
                 pipe_tasks_counter.update({name: tlb})
 
-            # To get inside tools, etc. C++ level
-            count_specials = True
+            # To get inside tools, etc. C++ level - use with care - very verbose output
+            count_specials = False
             if count_specials:
                 pipe_c_specials = ['pipeline.hif.heuristics.imageparams_base::Imager::open()',
                                    'pipeline.hif.tasks.tclean.tclean::imager',
@@ -1076,10 +1076,12 @@ def go_through_log_lines(logf):
         # check mpi
         mpi_server_str = '::casa::MPIServer-'
         if mpi_server_str in line and 'CASA' in line:
-            mpi_server_re = 'INFO\s+::casa::MPIServer-\d+\s+CASA\s+Version\s+'
+            mpi_server_re = 'INFO\s+::casa::MPIServer-(\d+)\s+CASA\s+Version\s+'
             mpi_match = re.search(mpi_server_re, line)
             if mpi_match:
-                mpi_server_cnt += 1
+                server_idx = int(mpi_match.group(1))
+                if server_idx > mpi_server_cnt:
+                    mpi_server_cnt = server_idx
 
 
         # Handle begin/end task
@@ -1372,7 +1374,7 @@ def parse_casa_log_file_print_info(fname, print_info=True):
         casa_log_file_dump_info(log_info, pickle=False)
 
         return log_info
-
+        
 def process_casa_logs(log_fnames, make_plots=False, make_tables=False):
     """
     Gets an info object from a casa log file and passes the information on to
@@ -1380,7 +1382,7 @@ def process_casa_logs(log_fnames, make_plots=False, make_tables=False):
     of test runs.
     """
     print(' * ===========================================')
-    print(' * List of log files: {0}'.format(log_fnames))
+    print(' * Log files: {0}'.format(log_fnames))
     print(' * Produce tables? {0}'.format(make_tables))
     print(' * Produce plots? {0}'.format(make_plots))
     print(' * ===========================================')
