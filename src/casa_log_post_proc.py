@@ -68,11 +68,14 @@ class CASALogInfo(object):
         """
         short_dataset_id = ''
         try:
-            from casa_logs_mous_props import mous_short_names
             try:
+                from casa_logs_mous_props import mous_short_names
                 short_dataset_id = mous_short_names[self._mous]
-            except KeyError:
-                short_dataset_id = 'no_short_name_' + str(self._project_tstamp)
+            except (ImportError, KeyError):
+                if not '_' in self._project_tstamp:
+                    raise RuntimeError('Cannot find expected _ in project name: {}. Giging'
+                                       ' up'.format(self._project_tstamp))
+                short_dataset_id = self._project_tstamp.split('_')[0]
         except ImportError:
             pass
 
@@ -149,6 +152,7 @@ class CASATaskAggLogInfo(object):
             self._taccum_pipe_stages[pipe_stages_current] = task_runtime
         else:
             self._taccum_pipe_stages[pipe_stages_current] += task_runtime
+
         stage_idx = int(pipe_stages_current)
         if stage_idx >= 23:
             self._taccum_imaging_23_ += task_runtime
@@ -953,6 +957,7 @@ def go_through_log_lines(logf):
                 pipe_tasks_counter.update({name: tlb})
 
             # To get inside tools, etc. C++ level - use with care - very verbose output
+            # Recommended: False, unless you want to debug/get lots of lines 
             count_specials = False
             if count_specials:
                 pipe_c_specials = ['pipeline.hif.heuristics.imageparams_base::Imager::open()',
@@ -1340,14 +1345,15 @@ def casa_log_file_print_info(all_cnt, all_taccum, log_info):
           format(all_taccum, pipe_taccum, pipe_infra_taccum, pipe_h_taccum,
                  pipe_hif_taccum, pipe_hifa_taccum, pipe_recipereducer_taccum,
                  pipe_qa_taccum))
-
-    task_imageparams = 'hif.heuristics.imageparams_base'
     try:
-        cnt = pipe_tasks_counter[task_imageparams]._taccum
+        task_imageparams = 'hif.heuristics.imageparams_base'
         print("Accum time, pipeline.{0}: {1}".
-              format(task_imageparams, cnt))
-    except KeyError:
-        pass
+              format(task_imageparams,
+                     pipe_tasks_counter[task_imageparams]._taccum))
+    except KeyError as exc:
+        print(' NOTE: looks like imageparams_base is not found in the log: {}.'
+              ' There might have been errors in that run'.
+              format(task_imageparams))
 
     total_tdelta = datetime.timedelta(seconds=log_info._total_time)
     elapsed_tbl_format = format_tbl_elapsed(total_tdelta)
@@ -1405,8 +1411,16 @@ def casa_log_file_dump_info(log_info, json=True, pickle=True):
 
     
 def parse_casa_log_file_print_info(fname, print_info=True):
+    import traceback
+
     with open(fname) as logf:        
-        (all_cnt, all_taccum, log_info) = go_through_log_lines(logf)
+        try:
+            (all_cnt, all_taccum, log_info) = go_through_log_lines(logf)
+        except Exception as exc:
+            print(' *** Something went wrong while parsing input file ***')
+            traceback.print_exc()
+            raise RuntimeError('A failure here suggests the input log has some bad errors.'
+                               ' Not producing output. Exception was: {}'.format(exc))
 
         casa_log_file_print_info(all_cnt, all_taccum, log_info)
 
@@ -1435,8 +1449,12 @@ def process_casa_logs(log_fnames, make_plots=False, make_tables=False):
     for fname in log_fnames:
         print(' * ===========================================')
         print(' * Processing log file: {0}'.format(fname))
-        log_info = parse_casa_log_file_print_info(fname, print_info=True)
-        run_infos.append(log_info)
+        try:
+            log_info = parse_casa_log_file_print_info(fname, print_info=True)
+            run_infos.append(log_info)
+        except RuntimeError as exc:
+            print(' * BAD SIGN - BAD SIGN - BAD SIGN - BAD SIGN - there was some problem '
+                  'in this input log file. Please check: {}'.format(exc))
 
     if make_plots:
         plot_timing_things(run_infos)
