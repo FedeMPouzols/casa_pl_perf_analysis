@@ -66,11 +66,19 @@ class CASALogInfo(object):
         repetitions of a same test at different times, or with different number
         of cores/MPI servers.
         """
-        return ('{0}_mpi_{1}_host_{2}_casa_{3}_tstamp_{4}'.
-                format(self.build_file_mous_tag_name(),
+        short_dataset_id = ''
+        try:
+            from casa_logs_mous_props import mous_short_names
+            short_dataset_id = mous_short_names[self._mous]
+        except ImportError:
+            pass
+
+        return ('{0}_MOUS_{1}_mpi_{2}_host_{3}_casa_{4}_tstamp_{5}'.
+                format(short_dataset_id,
+                       self.build_file_mous_tag_name(),
                        self._mpi_servers, self._run_machine, self._casa_version,
                        self._first_tstamp.strftime(self.FILENAME_TSTAMP_STRFTIME)))
-        
+
     def build_file_mous_tag_name(self):
         """
         Use to produce a MOUS or first EB uid tag for the file names of the
@@ -143,6 +151,12 @@ class CASATaskAggLogInfo(object):
         else:
             self._taccum_calib_1_22 += task_runtime
 
+class CommonBeamInfo(object):
+    def __init__(self, major, minor, pa):
+        self._major = major
+        self._minor = minor
+        self._pa = pa
+
 class CASATaskDetails(object):
     """
     For tasks for which detailed called info is parsed, for example
@@ -156,6 +170,7 @@ class CASATaskDetails(object):
         self._pipe_stage_name = pipe_stage_name
         self._runtime = 0
         self._params = params
+        self._further_info = {}
 
 def get_ranked_dict_by_taccum(dict_taccum):
     """
@@ -174,8 +189,13 @@ def print_ranked_pipe_tasks_counter(ptc):
     total = sum([item._taccum for item in sorted_ptc])
     print('# task_name, num_calls, time_sec, time_percentage_all_tasks')
     for val in sorted_ptc:
+        # The pseudo-tasks/pipeline things/other often accumulate just 0s
+        if 0 == total:
+            pc_accum = 0
+        else:
+            pc_accum = val._taccum / total * 100.0
         print('{0}, {1}, {2}, {3:.2f}'.format(val._name, val._cnt, val._taccum,
-                                          val._taccum / total * 100.0))
+                                              pc_accum))
     print('---------------------------')
 
 def print_ranked_pipe_stages_counter(psc):
@@ -947,6 +967,57 @@ def go_through_log_lines(logf):
                 entry._block_found_open = True
                 special_task_patterns.update({task_pattern: entry})
 
+
+
+        # Parse specific log lines from inside tclean
+        # Beam and common beam
+        # Beam. In serial it looks like:
+        # task_tclean::SIImageStore::printBeamSet         Beam : 0.54814 arcsec, 0.369634 arcsec, 89.7918 deg
+        # In parallel:
+        # SIImageStore::restore   Common Beam : 0.54814 arcsec, 0.369634 arcsec, 89.7918 deg
+        if (task_details_task_name == 'tclean' and
+            ('Common Beam :' in line and '::SIImageStore::restore' in line
+             or
+             ('Beam :' in line and '::SIImageStore::printBeamSet' in line))):
+            details = tasks_details_params[-1]
+            if 'tclean' == details._name and (0 == mpi_server_cnt or
+                                              'True' == details._params['parallel']):
+                cb_values_re = '([^\s]+) arcsec, ([^\s]+) arcsec, ([^\s]+) deg'
+                # Common Beam for chan : 0 : 0.027519 arcsec, 0.0220263 arcsec, -56.0013 deg
+                cb0_hdr = 'Beam for chan : 0 :'
+                if cb0_hdr in line:
+                    cb_chan0_re = '{0} {1}'.format(cb0_hdr, cb_values_re)
+                    re_match = re.search(cb_chan0_re, line)
+                    if re_match:
+                        cbeam_chan0 = CommonBeamInfo(re_match.group(1), re_match.group(2),
+                                                     re_match.group(3))
+                        details._further_info['common_beam_chan0'] = cbeam_chan0
+                # Common Beam : 0.027519 arcsec, 0.0220263 arcsec, -56.0013 deg
+                else:
+                    cb_re = 'Beam : {0}'.format(cb_values_re)
+                    re_match = re.search(cb_re, line)
+                    if re_match:
+                        cbeam = CommonBeamInfo(re_match.group(1), re_match.group(2),
+                                               re_match.group(3))
+                        details._further_info['common_beam'] = cbeam
+
+                tasks_details_params[-1] = details
+        # Completed 157 iterations.
+        # ...
+        # ------ Run Major Cycle 1 ------
+        # (also lines like:)
+        # ------ Run (Last) Major Cycle 1 ------
+        major_cycle = 'Major Cycle '
+        if (task_details_task_name == 'tclean' and
+            major_cycle in line):
+            details = tasks_details_params[-1]
+            cycle_re = '{0} (\d+)'.format(major_cycle)
+            re_match = re.search(cycle_re, line)
+            if re_match:
+                idx = re_match.group(1)
+                details._further_info['major_cycle_max'] = idx
+                tasks_details_params[-1] = details
+                
         # def identify_first_eb
         # Look for a line that contains something like:
         # hifa_importdata(vis=['uid___A002_Xb8e961_Xb0d', 'uid___A002_Xb8f857_X1176', 'uid___A002_Xb91513_X1936'], session=['default', 'default', 'default'])
@@ -1252,20 +1323,9 @@ def casa_log_file_print_info(all_cnt, all_taccum, log_info):
     print(' - Total elapsed time - all accumulated CASA tasks time: {0} '
           '(in seconds: {1})'.format(datetime.timedelta(seconds=no_casa), no_casa))
 
-def casa_log_file_dump_info(log_info):
-    """
-    For now dump to pickle and json files
-    """
-    import pickle
-
-    filename = 'casa_logs_timing_' + log_info.build_filename_extended_tags()
-
-    filename_pkl = filename + '.pickle'
-    with open(filename_pkl, 'wb') as pklf:
-        print(' * Dumping log info object into pickle file: {0}'.format(filename_pkl))
-        pickle.dump(log_info, pklf, protocol=pickle.HIGHEST_PROTOCOL)
-
+def casa_log_file_dump_to_json(filename, log_info):
     import json
+
     def json_default(obj):
         import datetime
         if isinstance(obj, datetime.datetime):
@@ -1275,10 +1335,33 @@ def casa_log_file_dump_info(log_info):
         else:
             return obj.__dict__
 
-    filename_json = filename + '.json'
-    with open(filename_json, 'w') as jsonf:
-        print(' * Dumping log info object into JSON file: {0}'.format(filename_json))
+    with open(filename, 'w') as jsonf:
         json.dump(log_info, jsonf, indent=2, sort_keys=True, default=json_default)
+
+
+def casa_log_file_dump_to_pickle(filename, log_info):
+    import pickle
+
+    with open(filename, 'wb') as pklf:
+        pickle.dump(log_info, pklf, protocol=pickle.HIGHEST_PROTOCOL)
+
+def casa_log_file_dump_info(log_info, json=True, pickle=True):
+    """
+    For now dump to pickle and json files
+    """
+
+    filename = 'casa_logs_perf_' + log_info.build_filename_extended_tags()
+
+    if pickle:
+        filename_pkl = filename + '.pickle'
+        print(' * Dumping log info object into pickle file: {0}'.format(filename_pkl))
+        casa_log_file_dump_to_pickle(filename_pkl, log_info)
+
+    if json:
+        filename_json = filename + '.json'
+        print(' * Dumping log info object into JSON file: {0}'.format(filename_json))
+        casa_log_file_dump_to_json(filename_json, log_info)
+
     
 def parse_casa_log_file_print_info(fname, print_info=True):
     with open(fname) as logf:        
@@ -1286,10 +1369,10 @@ def parse_casa_log_file_print_info(fname, print_info=True):
 
         casa_log_file_print_info(all_cnt, all_taccum, log_info)
 
-        casa_log_file_dump_info(log_info)
+        casa_log_file_dump_info(log_info, pickle=False)
 
         return log_info
-        
+
 def process_casa_logs(log_fnames, make_plots=False, make_tables=False):
     """
     Gets an info object from a casa log file and passes the information on to
@@ -1297,7 +1380,7 @@ def process_casa_logs(log_fnames, make_plots=False, make_tables=False):
     of test runs.
     """
     print(' * ===========================================')
-    print(' * Log files: {0}'.format(log_fnames))
+    print(' * List of log files: {0}'.format(log_fnames))
     print(' * Produce tables? {0}'.format(make_tables))
     print(' * Produce plots? {0}'.format(make_plots))
     print(' * ===========================================')
