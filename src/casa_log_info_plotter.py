@@ -2476,6 +2476,10 @@ def print_html_summary(serial_infos, parallel_infos):
         last_end = max([info['_last_tstamp'] for _key, info in parallel_infos.items()])
         casa_versions = [info['_casa_version'] for _key, info in parallel_infos.items()]
         machines = set([info['_run_machine'] for _key, info in parallel_infos.items()])
+        oldest_casa = min(casa_versions)
+        oldest_freq = casa_versions.count(oldest_casa)
+        newest_casa = max(casa_versions)
+        newest_freq = casa_versions.count(newest_casa)        
 
         html +='<table class="datasets-tbl">\n<thead>\n'
         html += ('<tr>'
@@ -2488,11 +2492,11 @@ def print_html_summary(serial_infos, parallel_infos):
         )
         html += ('<tbody>\n'
                  '<tr> <td>{}</td> <td>{}</td>'
-                 '<td>{}</td> <td>{}</td>'
-                 '<td>{}</td> <td>{}</td>'
+                 '<td>{} </td> <td>{} ({} times)</td>'
+                 '<td>{} ({} times)</td> <td>{}</td>'
                  '</tr>\n'.format(len(serial_infos)+len(parallel_infos), first_start,
-                                  last_end, min(casa_versions), max(casa_versions),
-                                  len(machines)) 
+                                  last_end, oldest_casa, oldest_freq, newest_casa,
+                                  newest_freq, len(machines)) 
         )
         html += '</table>\n'
 
