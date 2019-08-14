@@ -2747,7 +2747,7 @@ def main_info_plotter(input_dir, make_general_plots=False,
 
     # This is for example for flagdata
     if make_task_per_pl_stage_plots:
-        tasks = ['flagdata', 'tclean']
+        tasks = ['flagdata', 'tclean', 'applycal', 'gaincal', 'plotms']
         for tsk in tasks:
             if serial_infos:
                 do_task_runtime_per_pl_stg_plots(serial_infos, 'serial', task=tsk)
