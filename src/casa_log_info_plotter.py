@@ -2821,27 +2821,33 @@ def main():
     parser.add_argument('input_directory', nargs=1, help=
                         'All the .json files found in the directory are used to produce '
                         'the plots', type=str)
+    parser.add_argument('--bundle-html', action='store_true',
+                        help='This is ia meta-option that enables a set of options used '
+                        'to produce a set of html pages and plot files. It enables '
+                        '--gen-html-summary, --make-datasets-histos, etc. It is meant '
+                        'as a simple and single option to use for a one-go command to make '
+                        'all usual plots and the html pages that display them.')
     parser.add_argument('--make-general-plots', action='store_true')
-    parser.add_argument('--make-tasks-stats-plots', action='store_true',
-                        help='boxplots of stats of CASA tasks for one dataset')
-
+    parser.add_argument('--make-datasets-histos', action='store_true',
+                        help='histograms of dataset sizes and runtimes')
     parser.add_argument('--make-summed-tasks-stages-plots', action='store_true',
                         help='boxplots of summed up times of  CASA tasks and '
                         'pipeline stages')
+    parser.add_argument('--make-tasks-stats-plots', action='store_true',
+                        help='boxplots of stats of CASA tasks for one dataset')
+
     parser.add_argument('--make-task-per-pl-stage-plots', action='store_true',
                         help='bar plots of run time of tasks in different  '
                         'pipeline stages (flagdata, etc.)')
-    
     parser.add_argument('--make-per-pl-stage-barplots',action='store_true',
-                        help='barplots per PL stage, with CASA tasks and "other"')
+                        help='barplots per PL stage, with CASA tasks and "other". This '
+                        'produces one plot per dataset/execution')
     parser.add_argument('--make-multicore-plots', action='store_true',
                         help='barplots of runtime per CASA task for a range of '
                         'number of cores')
     parser.add_argument('--make-percentages-plots', action='store_true')
     parser.add_argument('--make-tclean-plots', action='store_true')
     parser.add_argument('--make-beam-stats', action='store_true')
-    parser.add_argument('--make-datasets-histos', action='store_true',
-                        help='histograms of dataset sizes and runtimes')
     parser.add_argument('--gen-html-summary', action='store_true')
     parser.add_argument('--casa-5-4', action='store_true')
     
@@ -2852,6 +2858,17 @@ def main():
         print('* CASA 5.4')
         LAST_CALIB_STAGE = 23
         print('* last calib stage: {0}'.format(LAST_CALIB_STAGE))
+
+    def enable_bundle_html(args):
+        args.make_datasets_histos = True
+        args.make_summed_tasks_stages_plots = True
+        args.make_tasks_stats_plots = True
+        args.make_task_per_pl_stage_plots = True
+        args.make_per_pl_stage_barplots = True
+        args.gen_html_summary = True
+        
+    if args.bundle_html:
+        enable_bundle_html(args)
 
     main_info_plotter(args.input_directory[0], args.make_general_plots,
                       args.make_tasks_stats_plots,
