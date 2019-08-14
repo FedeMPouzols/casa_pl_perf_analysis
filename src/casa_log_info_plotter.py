@@ -6,9 +6,9 @@ from casa_logs_mous_props import mous_sizes, mous_short_names
 
 too_verbose = False
 
-FONTSIZE_LEGEND = 14
-FONTSIZE_AXES = 14
-FONTSIZE_TITLE = 16
+FONTSIZE_LEGEND = 16
+FONTSIZE_AXES = 16
+FONTSIZE_TITLE = 18
 
 
 class Struct:
@@ -131,7 +131,7 @@ def gen_dual_plot(serial_x, serial_y, parallel_x, parallel_y,
         ylabel = '{0} run time, serial and parallel ({1})'.format(what_plot, time_units)
     plt.ylabel(ylabel, fontsize=FONTSIZE_AXES)
     if not title:
-        title = '{0} run time, pipeline runs in serial (black) and parallel (colors) mode'.format(what_plot)
+        title = '{0} run time, pipeline runs, serial (black) and parallel (colors) mode'.format(what_plot)
     plt.title(title,fontsize=FONTSIZE_TITLE)
 
     if too_verbose:
@@ -156,6 +156,8 @@ def gen_dual_plot(serial_x, serial_y, parallel_x, parallel_y,
     plt.plot([0, 1000], [0, 1000], color='black', marker='', linestyle=':', label='')
     plt.xlim(0, max(serial_x) + x_tol)
     plt.ylim(0, max(max(parallel_y),max(serial_y)) + y_tol)
+    plt.yticks(fontsize=FONTSIZE_AXES)
+    plt.xticks(fontsize=FONTSIZE_AXES)
     plt.grid('on')
     if not legend_loc:
         legend_loc = 'upper left'
@@ -697,7 +699,7 @@ def gen_tclean_plot(serial_x, serial_y, parallel_x, parallel_y,
                    fontsize=FONTSIZE_AXES)
     plt.ylabel('{0} run time, serial and parallel ({1})'.format(what_plot, time_units),
                fontsize=FONTSIZE_AXES)
-    plt.title('{0} run time, pipeline runs in serial (black) and parallel (colors) mode'.
+    plt.title('{0} run time, pipeline runs, serial (black) and parallel (colors) mode'.
               format(what_plot),
               fontsize=FONTSIZE_TITLE)
 
@@ -715,6 +717,8 @@ def gen_tclean_plot(serial_x, serial_y, parallel_x, parallel_y,
     y_tol = (max(serial_y)-min(serial_y)) * 0.02
     plt.xlim(0, max(serial_x) + x_tol)
     plt.ylim(0, max(max(parallel_y),max(serial_y)) + y_tol)
+    plt.yticks(fontsize=FONTSIZE_AXES)
+    plt.xticks(fontsize=FONTSIZE_AXES)
     plt.grid('on')
     plt.legend(loc='upper left', prop={'size': FONTSIZE_LEGEND}) # 'best' 'upper right'
 
@@ -1127,9 +1131,11 @@ def show_basic_stats(serial_infos, par_infos, multi_par_infos, show=True):
     par_runtimes = get_total_runtimes(par_infos)
     multi_par_runtimes = get_total_runtimes_multicore(multi_par_infos)
 
-    print(' * Basic overall stats for serial runtimes:')
+    print(' * Basic overall stats for serial runtimes ({0}):'.
+          format(len(serial_runtimes)))
     show_total_runtime_stats(serial_runtimes)
-    print(' * Basic overall stats for parallel runtimes:')
+    print(' * Basic overall stats for parallel runtimes ({0}):'.
+          format(len(par_runtimes)))
     show_total_runtime_stats(par_runtimes)
 
     print(' * Basic overall stats for parallel runtimes (multicore runs, when available):')
@@ -1152,11 +1158,10 @@ def show_basic_stats(serial_infos, par_infos, multi_par_infos, show=True):
 #             multicore_lists[mous] = [obj]
 
 #     return multicore_lists
-
-def plot_multicore_list_runs(run_infos, metric_lambda,
+SECS_TO_HOURS = 3600.0
+def plot_multicore_list_runs(run_infos, metric_lambdas,
                              ptype='full_pipeline',
                              ylabel='Pipeline run time (hours)',
-                             metrics_others=None,
                              legends=None):
     """
     :param run_infos: run info objects in a list, corresponding to pipeline runs of a same
@@ -1177,43 +1182,48 @@ def plot_multicore_list_runs(run_infos, metric_lambda,
     # Convenience: sort by # mpi servers
     run_infos.sort(key=lambda x: x['_mpi_servers'], reverse=False)
     
-    SECS_TO_HOURS = 3600
     num_servers = [info['_mpi_servers'] for info in run_infos]
     servers_axis = range(len(num_servers))
-    #times_total = np.array([info['_total_time'] for info in run_infos]) / SECS_TO_HOURS
-    times_total = np.array([metric_lambda(info) for info in run_infos]) / SECS_TO_HOURS
-    times_casa_tasks = np.array([info['_total_time_casa_tasks'] for info in run_infos]) / SECS_TO_HOURS
-    times_other = times_total - times_casa_tasks
     width = 0.3
 
 
-    if 'full_pipeline' == ptype:
-        # we only have in/out tasks
-        bar1 = plt.bar(servers_axis, times_casa_tasks, width, color='darkblue')
-        bar2 = plt.bar(servers_axis, times_other, width, bottom=times_casa_tasks,
-                       color='lightblue')
-        plt.legend((bar1[0], bar2[0]), ('Time inside CASA tasks', 'Time \'other\''),
-                   loc='upper center', prop={'size': FONTSIZE_TITLE})
-    elif metrics_others:
-        bars = []
-        colors = ['darkblue', 'g', 'y', 'm']
-        prev_val = None
-        sum_bar = np.zeros((len(run_infos)))
-        for idx, metric in enumerate(metrics_others):
-            val_bar = np.array([metric(info) for info in run_infos]) / SECS_TO_HOURS
-            if 0 == idx:
-                bar = plt.bar(servers_axis, val_bar, width, color=colors[idx])
-            else:
-                bar = plt.bar(servers_axis, val_bar, width, bottom=prev_val,
-                              color=colors[idx])
-            bars.append(bar)
-            prev_val = val_bar
-            sum_bar += val_bar
-        get_lines = lambda bars: [b[0] for b in bars]
-        plt.legend(get_lines(bars), (legends), loc='upper center', 
-                   prop={'size': FONTSIZE_TITLE})
+    # if 'full_pipeline' == ptype:
+    #     # we only have in/out tasks
+    #     bar1 = plt.bar(servers_axis, times_casa_tasks, width, color='darkblue')
+    #     bar2 = plt.bar(servers_axis, times_other, width, bottom=times_casa_tasks,
+    #                    color='lightblue')
+    #     plt.legend((bar1[0], bar2[0]), ('Time inside CASA tasks', 'Time \'other\''),
+    #                loc='upper center', prop={'size': FONTSIZE_TITLE})
+    # elif metrics_others:
+    bars = []
+    # Colors will be used with "-idx-1" so that the first in this list is assigned
+    # to the top section of the bar (which is the last in the list of metrics)
+    if 1 == len(metric_lambdas):
+        colors = ['darkblue']
+    elif 2 == len(metric_lambdas):
+        colors = ['lightblue', 'darkblue']
     else:
-        bar1 = plt.bar(servers_axis, times_total, width, color='darkblue')
+        colors = ['red', 'darkgreen', 'darkblue', 'orange', 'blue', 'lightgreen',
+                  'lightblue', 'lightyellow',  'magenta', 'k', 'cyan', 'red', 'k']
+    prev_val = None
+    sum_val = np.zeros((len(run_infos)))
+    for idx, metric in enumerate(metric_lambdas):
+        val_bar = np.array([metric(info) for info in run_infos]) / SECS_TO_HOURS
+        color_idx = -idx -1 + len(metric_lambdas)
+        if 0 == idx:
+            bar = plt.bar(servers_axis, val_bar, width, color=colors[color_idx])
+        else:
+            bar = plt.bar(servers_axis, val_bar, width, bottom=sum_val,
+                          color=colors[color_idx])
+        bars.append(bar)
+        sum_val += val_bar
+
+    if legends:
+        get_lines = lambda bars: [b[0] for b in bars]
+        # reversed because the first is the lowest in the stacked bars,
+        # reverse will put then the first at the bottom of the legend lines
+        plt.legend(reversed(get_lines(bars)), reversed(legends), loc='upper center', 
+                   prop={'size': FONTSIZE_TITLE})
 
     plt.xlim(0, max(servers_axis)+0.7)
     plt.xticks(servers_axis, num_servers, fontsize=FONTSIZE_TITLE)
@@ -1221,12 +1231,8 @@ def plot_multicore_list_runs(run_infos, metric_lambda,
 
     # Labels with factor:
     ax = fig.axes[0]
-    if not metrics_others:
-        top_bar = times_total
-    else:
-        top_bar = sum_bar
-    for idx, val in enumerate(top_bar):
-            ax.text(idx + .25, val + 0.3, 'x{0:1.2f}'.format(times_total[0]/val),
+    for idx, val in enumerate(sum_val):
+            ax.text(idx + .25, val + 0.3, 'x{0:1.2f}'.format(sum_val[0]/val),
                     color='k', fontweight='bold', fontsize=FONTSIZE_TITLE)
 
     mous = run_infos[0]['_mous']
@@ -1256,53 +1262,92 @@ def do_all_multicore_plots(multicore_parallel_infos, min_par=2):
         if len(obj) >= 3:
             # total/full pipeline runtime
             metric_total = lambda x: x['_total_time']
-            plot_multicore_list_runs(obj, metric_total, ptype='full_pipeline')
+            metric_casa_tasks = lambda x: x['_total_time_casa_tasks']
+            metric_other = lambda x: metric_total(x) - metric_casa_tasks(x)
+            plot_multicore_list_runs(obj, [metric_casa_tasks, metric_other],
+                                     ptype='full_pipeline',
+                                     legends=['Time inside CASA tasks', 'Time \'other\''])
 
             metric_tclean = lambda x: x['_casa_tasks_counter']['tclean']['_taccum']
-            plot_multicore_list_runs(obj, metric_tclean, ptype='in_task_tclean',
-                                     ylabel='Task tclean runtime (hours)')
+            plot_multicore_list_runs(obj, [metric_tclean], ptype='in_task_tclean',
+                                     ylabel='Task tclean runtime (hours)',
+                                     legends=None)
 
             metric_findcont = lambda x: x['_pipe_stages_counter']['26']['_taccum']
-            plot_multicore_list_runs(obj, metric_findcont,
+            plot_multicore_list_runs(obj, [metric_findcont],
                                      ptype='in_pipe_stage_26_hif_findcont',
-                                     ylabel='Pipeline stage 26 hif_findcont run time (hours)')
-            plot_multicore_list_runs(obj, metric_findcont,
+                                     ylabel='Pipeline stage 26 hif_findcont run time (hours)',
+                                     legends=None)
+            plot_multicore_list_runs(obj, [metric_findcont],
                                      ptype='in_pipe_stage_26_hif_findcont',
-                                     ylabel='Pipeline stage 26 hif_findcont run time (hours)')
-
+                                     ylabel='Pipeline stage 26 hif_findcont run time (hours)',
+                                     legends=None)
+            
+            #metric_stage_1 = lambda x : x['_pipe_stages_counter']['1']['_taccum']
+            #metric_stage_25 = lambda x: x['_pipe_stages_counter']['25']['_taccum']
+            metric_stage_27 = lambda x: x['_pipe_stages_counter']['27']['_taccum']
+            metric_stage_28 = lambda x: x['_pipe_stages_counter']['28']['_taccum']
+            #metric_stage_32 = lambda x: x['_pipe_stages_counter']['32']['_taccum']
+            #metric_stage_34 = lambda x: x['_pipe_stages_counter']['34']['_taccum']
+            #metric_stage_35 = lambda x: x['_pipe_stages_counter']['35']['_taccum']
+            metric_stage_36 = lambda x: x['_pipe_stages_counter']['36']['_taccum']
+            metric_stages_3x = lambda x: metric_stage_27(x) + metric_stage_28(x) + metric_stage_36(x)
             metric_total_minus_26 = lambda x: metric_total(x)-metric_findcont(x)
-            plot_multicore_list_runs(obj, metric_total_minus_26,
+            metric_total_minus_26_3x = lambda x: metric_total(x)-metric_findcont(x)-metric_stages_3x(x)
+            plot_multicore_list_runs(obj, [metric_total_minus_26_3x, metric_findcont, metric_stages_3x],
                                      ptype='in_pipe_stage_26_hif_findcont',
                                      ylabel='Pipeline run time (hours)',
-                                     metrics_others=[metric_total_minus_26, metric_findcont],
                                      legends=['Everything else',
-                                              'Pipeline stage 26 hif_findcont'])
+                                              'Pipeline stage 26 hif_findcont',
+                                              'Pipeline stages 27,28,36'])  # hifa_importdata, hif_uvcontfit, hif_uvcontsub, hifa_exportdata
 
+
+            # metric_img_tclean = lambda x: x['_casa_tasks_counter']['tclean']['_taccum_imaging_23_']
+            #metric_img_flagdata = lambda x: x['_casa_tasks_counter']['flagdata']['_taccum_imaging_23_']
+
+
+
+            # TODO...doing: separate 'other' time and turn everything else into 'all other tasks', 'outside of tasks'
+            metric_flagdata = lambda x: x['_casa_tasks_counter']['flagdata']['_taccum']
+            metric_plotms = lambda x: x['_casa_tasks_counter']['plotms']['_taccum']
+            metric_importasdm = lambda x: x['_casa_tasks_counter']['importasdm']['_taccum']
+            metric_gaincal = lambda x: x['_casa_tasks_counter']['gaincal']['_taccum']
+            metric_applycal = lambda x: x['_casa_tasks_counter']['applycal']['_taccum']
+            metric_setjy = lambda x: x['_casa_tasks_counter']['setjy']['_taccum']
+            metric_included_tasks = lambda x: metric_tclean(x)+metric_flagdata(x)+metric_plotms(x)+metric_importasdm(x)+metric_gaincal(x)+metric_applycal(x)+metric_setjy(x)
+            metric_other_tasks = lambda x: metric_casa_tasks(x)-metric_included_tasks(x)
+            metric_total_minus_tasks = lambda x: metric_total(x)-metric_included_tasks(x)-metric_other_tasks(x)
+            plot_multicore_list_runs(obj, [metric_other_tasks, metric_setjy, metric_applycal, metric_gaincal, metric_importasdm, metric_plotms, metric_flagdata, metric_tclean, metric_total_minus_tasks],
+                                     ptype='_various_tasks_stacked_plot',
+                                     ylabel='Pipeline run time (hours)',
+                                     legends=['all other CASA tasks',
+                                              'setjy',
+                                              'applycal',
+                                              'gaincal',
+                                              'importasdm',
+                                              'plotms',
+                                              'flagdata',
+                                              'tclean',
+                                              'Outside CASA tasks'
+                                              ])  # hifa_importdata
+
+            
             metric_imaging_only = lambda x: sum(
                 [x['_pipe_stages_counter'][str(idx)]['_taccum']
                  for idx in range(PIPE_FIRST_IMAGING_STAGE, PIPE_LAST_STAGE+1)])
-            plot_multicore_list_runs(obj, metric_imaging_only,
+            plot_multicore_list_runs(obj, [metric_imaging_only],
                                      ptype='imaging_pipeline',
-                                     ylabel='Imaging pipeline run time (hours)')
+                                     ylabel='Imaging pipeline run time (hours)',
+                                     legends=None)
 
             metric_calib_only = lambda x: sum(
                 [x['_pipe_stages_counter'][str(idx)]['_taccum']
                  for idx in range(1, PIPE_FIRST_IMAGING_STAGE)])
-            plot_multicore_list_runs(obj, metric_calib_only,
+            plot_multicore_list_runs(obj, [metric_calib_only],
                                      ptype='calibration_pipeline',
-                                     ylabel='Calibration pipeline run time (hours)')
+                                     ylabel='Calibration pipeline run time (hours)',
+                                     legends=None)
 
-    # for (old) multi_as_dict
-    # print(' - Total datasets: {0}'.format(len(multicore_parallel_infos)))
-    # for mous_key, ds_infos in multicore_parallel_infos.items():
-    #     key0 = list(ds_infos.keys())[0]
-    #     print ('key0: {0}'.format(key0))
-
-    #     mous = ds_infos[key0]['_mous']
-    #     print(' - Dict len for {0}/{1}: {2}'.format(mous_key, mous, len(ds_infos)))
-    #     for key, obj in ds_infos.items():
-    #         #mous = obj[0]['_mous']
-    #         print(' - mpi: {0}'.format(obj['_mpi_servers']))
 
 def get_total_runtimes_h(run_infos):
     runtimes = {}
@@ -1363,6 +1408,63 @@ def main_info_plotter(input_dir, make_general_plots=False, make_multicore_plots=
         do_tclean_experimental_plots(serial_infos, parallel_infos, x_axis='cube_size')
 
     show_basic_stats(serial_infos, parallel_infos, multicore_parallel_infos)
+
+    produce_datasets_histograms(serial_infos, parallel_infos)
+
+
+def plot_histo(data_val, bin_width, ticks_dist, xlabel, ylabel, title, filename):
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    fig = plt.figure(figsize=(12,8))
+    val_range = max(data_val) - min(data_val)
+    bin_width = 5
+    bins_limits = range(0, max(data_val) + bin_width, bin_width)
+    n, bins, patches = plt.hist(data_val, bins=bins_limits, align='mid',
+                                facecolor='darkgreen')
+    plt.xlabel(xlabel, fontsize=FONTSIZE_TITLE)
+    plt.ylabel(ylabel, fontsize=FONTSIZE_TITLE)
+    plt.title(title.format(bin_width), fontsize=FONTSIZE_TITLE)
+    plt.xticks(fontsize=FONTSIZE_TITLE)
+    plt.xticks(np.arange(min(bins_limits), max(bins_limits), ticks_dist))
+    plt.yticks(fontsize=FONTSIZE_TITLE)
+    #plt.xlim(bins[0], 250) #bins[-1])
+    plt.grid(True)
+    fig.savefig(filename)
+
+# TODO: organize this
+def produce_datasets_histograms(serial_infos, parallel_infos):
+    sizes = []
+    times_serial = []
+    times_par = []
+    #print "serial_infos: ", serial_infos
+    for key, info in serial_infos.items():
+        # mous = key
+        mous = info['_mous']
+        sizes.append(mous_sizes[mous])
+        times_serial.append(info['_total_time'] / SECS_TO_HOURS)
+    for key, info in parallel_infos.items():
+        times_par.append(info['_total_time'] / SECS_TO_HOURS)
+
+    # Histo of sizes
+    bin_width = 5
+    plot_histo(sizes, bin_width=bin_width, ticks_dist=25, xlabel='ASDM sizes (GB)',
+               ylabel='Count of datasets (ASDMs)',
+               title='Histogram of ASDM sizes of tests (bins: {0} GB)'.format(bin_width),
+               filename='plot_pipeline_test_datasets_histo_sizes.png')
+
+    bin_width=4
+    plot_histo(times_serial, bin_width=bin_width, ticks_dist=24, xlabel='Run time (hours)',
+               ylabel='Count of datasets',
+               title='Histogram of full pipeline run times (serial mode) (bins: {0} hours)'.
+               format(bin_width),
+               filename='plot_pipeline_test_datasets_histo_runtimes_serial.png')
+
+    plot_histo(times_par, bin_width=bin_width, ticks_dist=10, xlabel='Run time (hours)',
+               ylabel='Count of datasets',
+               title='Histogram of full pipeline run times (parallel mode) (bins: {0} hours)'.
+               format(bin_width),
+               filename='plot_pipeline_test_datasets_histo_runtimes_parallel.png')
 
 
 def main():
