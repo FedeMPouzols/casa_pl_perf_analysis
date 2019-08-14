@@ -1326,7 +1326,129 @@ def plot_pl_stages_barplots(run_info, stages, stage_names,
                 bbox_inches='tight')
     plt.close()
 
-        
+def do_summed_runtime_plots(infos, name_suffix):
+    print(' ** Producing plots of overall runtime (runtime summed up) per CASA'
+          'task and pipeline stage. Name suffix {0}'.format(name_suffix))
+
+    tasks_full_time = dict()
+    tasks_calib_time = dict()
+    tasks_imaging_time = dict()
+    total_runtime = 0
+    total_runtime_calib = 0
+    total_runtime_img = 0
+    for _key, run_info in infos.items():
+        obj = run_info['_casa_tasks_counter']
+        total_runtime += run_info['_total_time']
+        len_stg = len(run_info['_pipe_stages_counter'])
+        # print('Len of stages: {0}, MOUS: {1}'.format(len_stg, run_info['_mous']))
+        if 36 == len_stg:
+            max_calib = 22
+            max_img = 36
+        elif 38 == len_stg:
+            max_calib = 24
+            max_img = 38
+
+        calib_stg_times = [run_info['_pipe_stages_counter'][str(stg_idx)]['_taccum'] for stg_idx in range(1, max_calib+1)]
+        total_runtime_calib += sum(calib_stg_times)
+        img_stg_times = [run_info['_pipe_stages_counter'][str(stg_idx)]['_taccum'] for stg_idx in range(max_calib+1, max_img)]
+        total_runtime_img += sum(img_stg_times)
+
+        #total =  run_info['_total_time_casa_tasks']
+        for _task, task_info in obj.items():
+            tasks_full_time.setdefault(_task, 0)
+            tasks_calib_time.setdefault(_task, 0)
+            tasks_imaging_time.setdefault(_task, 0)
+            tasks_full_time[_task] += task_info['_taccum']
+            tasks_calib_time[_task] += task_info['_taccum_calib_1_22']
+            tasks_imaging_time[_task] += task_info['_taccum_imaging_23_']
+
+    SECS_TO_DAYS = 3600*24
+    total_runs = len(infos)
+    # total_string = ('{0} runs, {1:.1f} days (calib: {2:.1f}, img: {3:.1f})'.
+    #                 format(total_runs, total_runtime/SECS_TO_DAYS,
+    #                        total_runtime_calib/SECS_TO_DAYS,
+    #                        total_runtime_img/SECS_TO_DAYS,))
+    total_string = ('{0} runs, {1:.1f} days'.format(total_runs,
+                                                    total_runtime/SECS_TO_DAYS))
+    # TODO: Add opt param string for the plot titles
+    gen_bar_plot_summed_times(tasks_full_time, 'full_pl_{0}'.format(name_suffix),
+                              total_runs=total_string,
+                              title_text='Full (calib+imag) pipeline')
+    gen_bar_plot_summed_times(tasks_calib_time,
+                              'calib_pl_{0}'.format(name_suffix),
+                              total_runs=total_string,
+                              title_text='Calibration pipeilne')
+    gen_bar_plot_summed_times(tasks_imaging_time,
+                              'imaging_pl_{0}'.format(name_suffix),
+                              total_runs=total_string,
+                              title_text='Imaging pipeline')
+
+
+    
+    pl_full_time = dict()
+    #tasks_calib_time = dict()
+    #tasks_imaging_time = dict()
+    total_runtime = 0
+    for _key, run_info in infos.items():
+        obj = run_info['_pipe_stages_counter']
+        total_runtime += run_info['_total_time']
+
+        total =  run_info['_total_time_casa_tasks']
+        for _stg, stg_info in obj.items():
+            stg_name = stg_info['_equiv_call']
+            pl_full_time.setdefault(stg_name, 0)
+            #tasks_calib_time.setdefault(_task, 0)
+            #tasks_imaging_time.setdefault(_task, 0)
+            pl_full_time[stg_name] += stg_info['_taccum']
+            #tasks_calib_time[_task] += task_info['_taccum_calib_1_22']
+            #tasks_imaging_time[_task] += task_info['_taccum_imaging_23_']
+    gen_bar_plot_summed_times(pl_full_time,
+                              'full_pl_{0}'.format(name_suffix),
+                              total_runs=total_string,
+                              title_text='Full (calib+imag) pipeline',
+                              figname_base='stages_pl_summed_runtime_barplot',
+                              rotation=75)
+
+def gen_bar_plot_summed_times(tasks_boxplot, figname_suffix,
+                              figname_base='tasks_summed_runtime_barplot',
+                              total_runs=None,
+                              title_text=None,
+                              max_tasks=None,
+                              rotation=60):
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    data_ll = [val for _key, val in tasks_boxplot.iteritems()]
+    task_names = [key for key, _val in tasks_boxplot.iteritems()]
+
+
+    sort_indices = list(reversed(np.argsort(data_ll)))
+    if max_tasks:
+        sort_indices = sort_indices[:max_tasks]
+
+    SECS_TO_DAYS = 3600*24
+    data_ll = [data_ll[idx]/SECS_TO_DAYS for idx in sort_indices]
+    task_names = [task_names[idx] for idx in sort_indices]
+
+    # bar plot
+    fig = plt.figure(figsize=(16,9))
+    ax = fig.add_subplot(1,1,1)
+    x_axis = range(len(task_names))
+    width = 0.5
+    plt.bar(x_axis, data_ll, width, color='#7777DD', align='edge')
+    # plt.xlim(0, max(x_axis)+0.7)
+    plt.xticks(x_axis, task_names, rotation=rotation, fontsize=FONTSIZE_TITLE)
+    plt.yticks(fontsize=FONTSIZE_TITLE)
+    plt.ylabel('Runtime (days)', fontsize=FONTSIZE_TITLE)
+    fig.subplots_adjust(bottom=0.3)
+    # TODO: gen_csv_summed_times_tasks
+
+    fig.suptitle('Total runtime, {0}, summed up ({1})'.
+                 format(total_runs, title_text), fontsize=FONTSIZE_TITLE)
+    fig.savefig('{0}_runs_{1}'.format(figname_base,
+                                      figname_suffix))
+    plt.close()
+
 def do_tasks_stats_plots(infos, name_suffix):
 
     print(' ** Producing CASA tasks stats (boxplots) plots, variant: {0}'.
@@ -1556,7 +1678,7 @@ def show_basic_stats(serial_infos, par_infos, multi_par_infos, show=True):
     #         fontsize=FONTSIZE_TITLE+6)
     print(names_infos)
     plt.xticks(range(0, len(x_axis)), names_infos, rotation=90)
-    fig.savefig(filename='plot_pl_test_datasets_pc_in_out_CASA_tasks.png')
+    fig.savefig('plot_pl_test_datasets_pc_in_out_CASA_tasks.png')
     plt.close()
 
     fig = plt.figure(figsize=(14, 6.5))
@@ -1571,7 +1693,7 @@ def show_basic_stats(serial_infos, par_infos, multi_par_infos, show=True):
     x_ticks = [3, 6, 12, 24, 48, 96, 192, 1000]
     plt.xticks(x_ticks, x_ticks)
     #plt.show()
-    fig.savefig(filename='plot_pl_test_datasets_pc_in_out_CASA_tasks_vs_runtime.png')
+    fig.savefig('plot_pl_test_datasets_pc_in_out_CASA_tasks_vs_runtime.png')
 
     # TODO: gen_csv!
 
@@ -1677,7 +1799,7 @@ def plot_multicore_list_runs(run_infos, metric_lambdas,
     plt.xticks(servers_axis, num_servers, fontsize=FONTSIZE_TITLE)
     plt.yticks(fontsize=FONTSIZE_TITLE)
 
-    # Labels with factor:
+    # Labels with "x1.3" multiplying factor:
     ax = fig.axes[0]
     for idx, val in enumerate(sum_val):
             ax.text(idx + .25, val + 0.3, 'x{0:1.2f}'.format(sum_val[0]/val),
@@ -2070,6 +2192,7 @@ def do_beam_stats(serial_infos, parallel_infos):
 
 def main_info_plotter(input_dir, make_general_plots=False,
                       make_tasks_stats_plots=False,
+                      make_summed_tasks_stages_plots=False,
                       make_per_pl_stage_barplots=False,
                       make_multicore_plots=False,
                       make_percentages_plots=False,
@@ -2106,6 +2229,12 @@ def main_info_plotter(input_dir, make_general_plots=False,
         if parallel_infos:
             do_tasks_stats_plots(parallel_infos, 'parallel')
         
+    if make_summed_tasks_stages_plots:
+        if serial_infos:
+            do_summed_runtime_plots(serial_infos, 'serial')
+        if parallel_infos:
+            do_summed_runtime_plots(parallel_infos, 'parallel')
+
     # only this one:
     # do_serial_parallel_plot_pipe_tasks_functions(serial_infos, parallel_infos)
 
@@ -2154,6 +2283,10 @@ def main():
     parser.add_argument('--make-tasks-stats-plots', action='store_true',
                         help='boxplots of stats of CASA tasks for one dataset')
 
+    parser.add_argument('--make-summed-tasks-stages-plots', action='store_true',
+                        help='boxplots of summed up times of  CASA tasks and '
+                        'pipeline stages')
+    
     parser.add_argument('--make-per-pl-stage-barplots',action='store_true',
                         help='barplots per PL stage, with CASA tasks and "other"')
     parser.add_argument('--make-multicore-plots', action='store_true',
@@ -2177,6 +2310,7 @@ def main():
 
     main_info_plotter(args.input_directory[0], args.make_general_plots,
                       args.make_tasks_stats_plots,
+                      args.make_summed_tasks_stages_plots,
                       args.make_per_pl_stage_barplots,
                       args.make_multicore_plots, args.make_percentages_plots,
                       args.make_tclean_plots, args.make_datasets_histos,
