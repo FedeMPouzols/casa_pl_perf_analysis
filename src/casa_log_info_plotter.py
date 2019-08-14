@@ -3,7 +3,7 @@
 import datetime
 
 from casa_logs_mous_props import mous_sizes, mous_short_names, get_asdms_size, ebs_cnt
-import casa_logs_mous_props #.ebs_cnt
+import casa_logs_mous_props
 
 too_verbose = False
 
@@ -14,7 +14,7 @@ FONTSIZE_TITLE = 18
 SECS_TO_HOURS = 3600.0
 SECS_TO_DAYS = SECS_TO_HOURS*24
 
-    
+# TODO: get rid of this old stuff
 # For CASA 5.2, 5.3
 LAST_CALIB_STAGE = 22
 # For CASA 5.4
@@ -66,6 +66,32 @@ def find_info_files(subdir):
     glob_pattern = os.path.join(subdir,'*uid__*.json')
     return [ifile for ifile in glob.glob(glob_pattern)]
 
+def format_pl_runtime(time_secs):
+    import datetime
+    SECS_PER_MIN = float(60.)
+    SECS_PER_HOUR = SECS_PER_MIN * 60.
+    SECS_PER_DAY = SECS_PER_HOUR * 24.
+    days = int(time_secs / SECS_PER_DAY)
+    remainder = time_secs
+    if days > 0:
+        remainder -= days * SECS_PER_DAY
+
+    hours = int(remainder / SECS_PER_HOUR)
+    if hours > 0:
+        remainder -= hours * SECS_PER_HOUR
+
+    minutes = int(remainder / SECS_PER_MIN)
+
+    res = ''
+    if days > 0:
+        res += '{0}d '.format(days)
+    # res += '{0:.2}h'.format(hours)
+    if hours > 0:
+        res += ' {0}h '.format(hours)
+    if minutes > 0:
+        res += ' {0}m '.format(minutes)
+    #print('days: {}, hours: {}'.format(days,hours))
+    return res.strip()
 
 def make_output_plot_name_base(file_base_prefix, more_prefix, what_plot):
     name_detail = what_plot.replace(' ', '_')
@@ -1222,7 +1248,14 @@ def do_per_pl_stage_barplots_multicore_infos(infos):
         print('* Producing PL stages barplots for MOUS: {0}'.format(mous))
         for info in obj:
             do_per_pl_stage_barplots(info)
-    pass
+
+def do_per_dataset_casa_tasks_barplots(infos):
+    print(' * do_per_dataset_casa_tasks_barplots')
+    for key, obj in infos.items():
+        mous = obj[0]['_mous']
+        print('* Producing CASA tasks barplots for MOUS: {0}'.format(mous))
+        for info in obj:
+            do_casa_tasks_barplot(info)
 
 def do_per_pl_stage_barplots(info):
     stages = sorted(list((map(int, info['_pipe_stages_counter'].keys()))))
@@ -1300,7 +1333,6 @@ def do_per_pl_stage_barplots(info):
                                      'Outside CASA tasks']
     )
     
-        
 # gen_pl_stages_barplots
 def plot_pl_stages_barplots(run_info, stages, stage_names,
                             metric_lambdas,
@@ -1354,12 +1386,14 @@ def plot_pl_stages_barplots(run_info, stages, stage_names,
     mpi = run_info['_mpi_servers']
 
     # TODO: make a function
-    short_name = ''
-    mous_size = ''
-    try:
-        short_name = mous_short_names[mous]
-    except KeyError:
-        short_name = run_info['_project_tstamp'].split('_')[0]
+    # short_name = ''
+    # mous_size = ''
+    # try:
+    #     short_name = mous_short_names[mous]
+    # except KeyError:
+    #     short_name = run_info['_project_tstamp'].split('_')[0]
+    # TODO: nope, forget old short names
+    short_name = run_info['_project_tstamp'].split('_')[0]
 
     mous_size = get_asdms_size(mous)
 
@@ -1371,6 +1405,70 @@ def plot_pl_stages_barplots(run_info, stages, stage_names,
                 bbox_inches='tight')
     plt.close()
 
+
+def do_casa_tasks_barplot(info, name_suffix=''):
+
+    verbose = False
+    if verbose:
+        print(' ** Producing plots of overall CASA tasks runtime per pipeline execution. '
+              'Name suffix: {}')
+
+    tasks_bars = {}
+    for task, task_counter in info['_casa_tasks_counter'].items():
+        tasks_bars[task] = task_counter['_taccum']
+
+    ctasks_time = format_pl_runtime(info['_total_time_casa_tasks'])
+    title_long = 'Runtime of CASA tasks (total within CASA tasks: {})'.format(ctasks_time)
+    proj = info['_project_tstamp'].split('_')[0]
+    mous = info['_mous']
+    parallel = info['_mpi_servers']
+    suffix = 'proj_{0}_MOUS_{1}_{2}'.format(proj, mous, parallel)
+    plot_bar_plot_casa_tasks(tasks_bars, figname_suffix=suffix,
+                             title_txt_long=title_long, rotation=75)
+
+def plot_bar_plot_casa_tasks(tasks_barplot, figname_suffix,
+                             figname_base='plot_per_dataset_casa_tasks_barplot',
+                             ylabel_txt='Runtime (hours)',
+                             title_txt_long=None,
+                             rotation=75, max_tasks=30):
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    verbose = False
+
+    data_ll = [val for _key, val in tasks_barplot.items()]
+    task_names = [key for key in tasks_barplot]
+    if verbose:
+        print(' * CASA task names: {}'.format(task_names))
+
+    sort_indices = list(reversed(np.argsort(data_ll)))
+    if max_tasks:
+        sort_indices = sort_indices[:max_tasks]
+    
+    data_ll = [data_ll[idx]/SECS_TO_HOURS for idx in sort_indices]
+    task_names = [task_names[idx] for idx in sort_indices]
+    print(' * sorted CASA task names: {}'.format(task_names))
+
+    # bar plot
+    fig = plt.figure(figsize=(12,8))
+    ax = fig.add_subplot(1,1,1)
+    x_axis = range(len(task_names))
+    width = 0.5
+    plt.bar(x_axis, data_ll, width, color='#7777DD', align='edge')
+    plt.xticks(x_axis, task_names, rotation=rotation, fontsize=FONTSIZE_TITLE)
+    plt.yticks(fontsize=FONTSIZE_TITLE)
+    plt.ylabel(ylabel_txt, fontsize=FONTSIZE_TITLE)
+
+    plt.grid(True)
+    fig.subplots_adjust(bottom=0.3)
+
+    if not title_txt_long:
+        title_txt_long = 'Runtime'
+    fig.suptitle(title_txt_long, fontsize=FONTSIZE_TITLE)
+    fig.savefig('{0}_{1}.png'.format(figname_base, figname_suffix))
+    plt.close()
+
+    
 def do_summed_runtime_plots(infos, name_suffix):
     print(' ** Producing plots of overall runtime (runtime summed up) per CASA'
           'task and pipeline stage. Name suffix {0}'.format(name_suffix))
@@ -1463,6 +1561,7 @@ def do_summed_runtime_plots(infos, name_suffix):
             pl_full_time[stg_name] += stg_info['_taccum']
             #tasks_calib_time[_task] += task_info['_taccum_calib_1_22']
             #tasks_imaging_time[_task] += task_info['_taccum_imaging_23_']
+
     gen_bar_plot_summed_times(pl_full_time,
                               'full_pl_{0}'.format(name_suffix),
                               total_runs=total_string,
@@ -1470,6 +1569,7 @@ def do_summed_runtime_plots(infos, name_suffix):
                               figname_base='stages_pl_summed_runtime_barplot',
                               rotation=75)
 
+# TODO: rename to plot_bar_plot_...
 def gen_bar_plot_summed_times(tasks_boxplot, figname_suffix,
                               figname_base='tasks_summed_runtime_barplot',
                               ylabel_txt='Runtime (days)',
@@ -1930,8 +2030,8 @@ def plot_multicore_list_runs(run_infos, metric_lambdas,
 
     gen_csv_multicore_list_run(num_servers, sum_val, mous_short_names[mous], mous, ptype)
     
-    fig.suptitle('{0}, MOUS: {1}, ASDM size: {2:.1f} GB'.
-                 format(mous_short_names[mous], mous, mous_sizes[mous]),
+    fig.suptitle('{0}, MOUS: {1}'.  # could add 'ASDM size: {2:.1f} GB' - mous_sizes[mous]
+                 format(mous_short_names[mous]),
                  fontsize=FONTSIZE_TITLE, fontweight='bold')
     fig.savefig('plot_bars_runtime_{0}_parallel_multiple_cores_MOUS_{1}_{2}.png'.
                 format(ptype, mous_short_names[mous], mous))
@@ -2283,33 +2383,6 @@ def print_html_summary(serial_infos, parallel_infos):
             ofile.write(res)
         
         return oname
-    
-    def format_pl_runtime(time_secs):
-        import datetime
-        SECS_PER_MIN = float(60.)
-        SECS_PER_HOUR = SECS_PER_MIN * 60.
-        SECS_PER_DAY = SECS_PER_HOUR * 24.
-        days = int(time_secs / SECS_PER_DAY)
-        remainder = time_secs
-        if days > 0:
-            remainder -= days * SECS_PER_DAY
-
-        hours = int(remainder / SECS_PER_HOUR)
-        if hours > 0:
-            remainder -= hours * SECS_PER_HOUR
-
-        minutes = int(remainder / SECS_PER_MIN)
-
-        res = ''
-        if days > 0:
-            res += '{0}d '.format(days)
-        # res += '{0:.2}h'.format(hours)
-        if hours > 0:
-            res += ' {0}h '.format(hours)
-        if minutes > 0:
-            res += ' {0}m '.format(minutes)
-        #print('days: {}, hours: {}'.format(days,hours))
-        return res
 
     def find_stages_run(info):
         stgs = info['_pipe_stages_counter']
@@ -2328,7 +2401,7 @@ def print_html_summary(serial_infos, parallel_infos):
                 'hifa_timegaincal' in stg_names
             )
 
-        def looks_like_imaging(stg_names):
+        def looks_like_plus_imaging_only(stg_names):
             """ 
             :param stg_names: list of stages names, ordered by run order 
             """
@@ -2339,13 +2412,25 @@ def print_html_summary(serial_infos, parallel_infos):
                 'hif_uvcontfit' in stg_names and
                 'hif_uvcontsub' in stg_names
             )
+
+        def looks_like_plus_imaging(stg_names):
+            """ 
+            :param stg_names: list of stages names, ordered by run order 
+            """
+            return (
+                stg_names.count('hifa_exportdata') >= 2 and 
+                'hif_mstransform' in stg_names and 
+                'hif_findcont' in stg_names and
+                'hif_uvcontfit' in stg_names and
+                'hif_uvcontsub' in stg_names
+            )
         
         if len(stgs) >= 20 and looks_like_calib(stg_names):
             res = 'calibration'
-            if len(stgs) >= 34 and looks_like_imaging(stg_names):
+            if len(stgs) >= 34 and looks_like_plus_imaging(stg_names):
                 res += ' + imaging'
 
-        elif len(stgs) >= 12 and looks_like_imaging(stg_names):  # 14+1 presently
+        elif len(stgs) >= 12 and looks_like_imaging_only(stg_names):  # 14+1 presently
             res = 'imaging'
             
         res += ' ({} stages)'.format(len(info['_pipe_stages_counter']))
@@ -2390,18 +2475,30 @@ def print_html_summary(serial_infos, parallel_infos):
         for uid, info in sorted(run_infos.items()):
             # Look for a plot named like:
             # plot_pl_stages_tasks_other_barplot_E2E6.1.00038.S_MOUS_uid___A002_Xcff05c_X277_mpi_7.png
+
+            exp_basic = ('The bar chart below shows the time consumed by every CASA task. '
+                         'All the executions of a same task, for example plotms, are '
+                         'aggregated into a single per-task time.')
             try:
-                barplot = glob.glob('plot_pl_stages_tasks_other_barplot_*_{}_*.png'.
+                barplot_basic = glob.glob('plot_per_dataset_casa_tasks_barplot_*_{}_*.png'.
                                     format(info['_mous']))[0]
             except (RuntimeError, IndexError):
-                print('Warning, could not find file with the bar plot of CASA tasks '
-                      'times in pipeline stages, for MOUS: {}'.format(info['_mous']))
-                barplot = ''
-                
+                print('Warning, could not find file with the bar plot of single-color '
+                      'CASA tasks overall times, for MOUS: {}'.format(info['_mous']))
+                barplot_basic = ''
+
             explanation = ('The bar chart below shows the time consumed by every pipeline '
                            'stage (x axis), and within each stage the time consumed by '
                            'different CASA tasks (colors).')
 
+            try:
+                barplot = glob.glob('plot_pl_stages_tasks_other_barplot_*_{}_*.png'.
+                                    format(info['_mous']))[0]
+            except (RuntimeError, IndexError):
+                print('Warning, could not find file with the multi-color bar plot of CASA '
+                      'tasks times in pipeline stages, for MOUS: {}'.format(info['_mous']))
+                barplot = ''
+                
             res = doc_hdr + '<html><head>\n'
             res += ('<title>MOUS {0} - execution {1}</title>'.
                     format(info['_mous'], info['_project_tstamp']))
@@ -2436,6 +2533,10 @@ def print_html_summary(serial_infos, parallel_infos):
             )
             res += '</tbody>\n'
             res += '</table>'
+
+            res += '<p>{}</p>'.format(exp_basic)
+            res += '<a href="{0}"><img src="{0}"/></a>'.format(
+                os.path.join('..', barplot_basic))
 
             res += '<p>{}</p>'.format(explanation)
             res += '<a href="{0}"><img src="{0}"/></a>'.format(
@@ -2728,6 +2829,7 @@ def main_info_plotter(input_dir, make_general_plots=False,
                       make_summed_tasks_stages_plots=False,
                       make_task_per_pl_stage_plots=False,
                       make_per_pl_stage_barplots=False,
+                      make_per_dataset_casa_tasks_barplots=False,
                       make_multicore_plots=False,
                       make_percentages_plots=False,
                       make_tclean_plots=False,
@@ -2785,7 +2887,10 @@ def main_info_plotter(input_dir, make_general_plots=False,
 
     if make_per_pl_stage_barplots:
         do_per_pl_stage_barplots_multicore_infos(multicore_parallel_infos)
-        
+
+    if make_per_dataset_casa_tasks_barplots:
+        do_per_dataset_casa_tasks_barplots(multicore_parallel_infos)
+
     # Experimental stuff I don't remember well - 201802
     if make_percentages_plots:
         # This is another type of plot that shows something in "parallel vs. serial"
@@ -2842,6 +2947,9 @@ def main():
     parser.add_argument('--make-per-pl-stage-barplots',action='store_true',
                         help='barplots per PL stage, with CASA tasks and "other". This '
                         'produces one plot per dataset/execution')
+    parser.add_argument('--make-per-dataset-casa-tasks-barplots',action='store_true',
+                        help='simple barplots of time per CASA task. This '
+                        'produces one plot per dataset/execution')
     parser.add_argument('--make-multicore-plots', action='store_true',
                         help='barplots of runtime per CASA task for a range of '
                         'number of cores')
@@ -2865,6 +2973,7 @@ def main():
         args.make_tasks_stats_plots = True
         args.make_task_per_pl_stage_plots = True
         args.make_per_pl_stage_barplots = True
+        args.make_per_dataset_casa_tasks_barplots = True
         args.gen_html_summary = True
         
     if args.bundle_html:
@@ -2875,6 +2984,7 @@ def main():
                       args.make_summed_tasks_stages_plots,
                       args.make_task_per_pl_stage_plots,
                       args.make_per_pl_stage_barplots,
+                      args.make_per_dataset_casa_tasks_barplots,
                       args.make_multicore_plots, args.make_percentages_plots,
                       args.make_tclean_plots, args.make_datasets_histos,
                       args.make_beam_stats,
