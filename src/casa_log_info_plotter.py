@@ -1702,6 +1702,11 @@ def gen_tasks_boxplots(tasks_boxplot, figname_suffix, max_tasks = 10,
     import numpy as np
     import matplotlib.pyplot as plt
 
+    if not tasks_boxplot:
+        print(' WARNING: refusing to make empty task boxplot. figname_suffix: {}. '
+              'plot_title_txt: {}'.format(figname_suffix, plot_title_txt))
+        return
+
     # data ready for boxplot, as a list of lists
     # useful?
     # items_ll = map(list, tasks_full_times.items())
