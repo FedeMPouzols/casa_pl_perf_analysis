@@ -190,11 +190,21 @@ class CASATaskDetails(object):
 def version_equal_or_after(vers_str, major, minor, patch):
     """"
     usage: version_equal_or_after(5,4,0) to know if it was >= 5.4.0
+    If the version string has a build -xxx, for example: 5.6.1-3, it is ignored for the
+    purpose of the version comparison.
     """
     vers = vers_str.split('.')
     if len(vers) != 3:
         raise RuntimeError('Cannot parse CASA version: {0}'.format(vers_str))
+    if isinstance(vers[2], str) and '-' in vers[2]:
+        patch_dash = vers[2].split('-')
+        if len(patch_dash) != 2:
+            raise RuntimeError('Cannot split with - on anomalous minor version number: '.
+                               format(vers[2]))
+        vers[2] = int(patch_dash[0])
+        vers.append(int(patch_dash[1]))
 
+    vers = [int(item) for item in vers]
     return (vers[0] > major or
             vers[0] == major and vers[1] > minor or
             vers[0] == major and vers[1] == minor and vers[2] >= patch)
@@ -424,8 +434,8 @@ def make_casa_tasks_table_file(out_fname, run_infos, rows, columns, cell_texts):
                   format(run_type, rinfo._run_machine, rinfo._first_tstamp,
                          rinfo._last_tstamp, rinfo._casa_version))
 
-        time_others = datetime.timedelta(seconds=
-                                         rinfo._total_time - rinfo._total_time_casa_tasks)
+        time_others = datetime.timedelta(seconds=rinfo._total_time -
+                                         rinfo._total_time_casa_tasks)
         if 'serial' is run_type or idx < 1:
             info_text = ('{0}\n{1}\n{2}\n{3}'.format(run_type,
                                                      datetime.timedelta(
@@ -447,7 +457,7 @@ def make_casa_tasks_table_file(out_fname, run_infos, rows, columns, cell_texts):
 
         plt.text(x_loc_info+0.3*(idx+1), y_loc_info, info_text,
                  horizontalalignment='left', verticalalignment='center',
-                 transform = ax.transAxes, fontsize=11)
+                 transform=ax.transAxes, fontsize=11)
 
     fig.suptitle(title, fontsize=11, x=0.08, horizontalalignment='left')
 
@@ -1388,6 +1398,7 @@ def casa_log_file_print_info(all_cnt, all_taccum, log_info):
     no_casa = log_info._total_time - log_info._total_time_casa_tasks
     print(' - Total elapsed time - all accumulated CASA tasks time: {0} '
           '(in seconds: {1})'.format(datetime.timedelta(seconds=no_casa), no_casa))
+
 
 def casa_log_file_dump_to_json(filename, log_info):
     import json
