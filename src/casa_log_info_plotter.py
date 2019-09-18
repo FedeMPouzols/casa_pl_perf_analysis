@@ -2337,6 +2337,7 @@ def print_html_summary(serial_infos, parallel_infos):
         res += '<hr/>'
         res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_full)
         res += '<hr/>'
+        
         res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_calib)
         res += '<hr/>'
         res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_img)
@@ -2398,6 +2399,7 @@ def print_html_summary(serial_infos, parallel_infos):
         def looks_like_calib(stg_names):
             return (
                 stg_names[0] == 'hifa_importdata' and
+                stg_names.count('hifa_exportdata') == 1 and
                 stg_names[1] == 'hifa_flagdata' and
                 stg_names[2] == 'hifa_fluxcalflag' and
                 stg_names[-1] == 'hifa_exportdata' and
@@ -2406,19 +2408,22 @@ def print_html_summary(serial_infos, parallel_infos):
                 'hifa_timegaincal' in stg_names
             )
 
-        def looks_like_plus_imaging_only(stg_names):
+        def looks_like_imaging_only(stg_names):
             """ 
             :param stg_names: list of stages names, ordered by run order 
             """
             return (
-                stg_names[0] == 'hif_mstransform' and
                 stg_names[-1] == 'hifa_exportdata' and
+                stg_names.count('hifa_exportdata') == 1 and
+                'hif_mstransform' in stg_names and
                 'hif_findcont' in stg_names and
                 'hif_uvcontfit' in stg_names and
-                'hif_uvcontsub' in stg_names
+                'hif_uvcontsub' in stg_names and
+                'hif_makeimlist' in stg_names and
+                'hif_makeimages' in stg_names
             )
 
-        def looks_like_plus_imaging(stg_names):
+        def looks_like_calib_plus_imaging(stg_names):
             """ 
             :param stg_names: list of stages names, ordered by run order 
             """
@@ -2432,7 +2437,7 @@ def print_html_summary(serial_infos, parallel_infos):
         
         if len(stgs) >= 20 and looks_like_calib(stg_names):
             res = 'calibration'
-            if len(stgs) >= 34 and looks_like_plus_imaging(stg_names):
+            if len(stgs) >= 34 and looks_like_calib_plus_imaging(stg_names):
                 res += ' + imaging'
 
         elif len(stgs) >= 12 and looks_like_imaging_only(stg_names):  # 14+1 presently
