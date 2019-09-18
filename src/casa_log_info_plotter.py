@@ -1532,7 +1532,7 @@ def do_summed_runtime_plots(infos, name_suffix):
     # TODO: Add opt param string for the plot titles
     gen_bar_plot_summed_times(tasks_full_time, 'full_pl_{0}'.format(name_suffix),
                               total_runs=total_string,
-                              title_text='All pipeline stages') # Full (calib+imag) pipeline
+                              title_text='all pipeline stages') # Full (calib+imag) pipeline
     gen_bar_plot_summed_times(tasks_calib_time,
                               'calib_pl_{0}'.format(name_suffix),
                               total_runs=total_string,
@@ -1565,7 +1565,7 @@ def do_summed_runtime_plots(infos, name_suffix):
     gen_bar_plot_summed_times(pl_full_time,
                               'full_pl_{0}'.format(name_suffix),
                               total_runs=total_string,
-                              title_text='All pipeline stages', # Full (calib+imag) pipeline
+                              title_text='all pipeline stages', # Full (calib+imag) pipeline
                               figname_base='stages_pl_summed_runtime_barplot',
                               rotation=75)
 
@@ -2293,7 +2293,7 @@ def print_html_summary(serial_infos, parallel_infos):
         run_name = 'performance_{}.html'.format(info['_mous'])
         return os.path.join(subdir_per_run, run_name)
 
-    def gen_subpage_overall_casa_stats():
+    def gen_subpage_overall_casa_stats(show_indiv_calib_img=False):
         """ returns the name of the page produced """
 
         oname = 'overall_casa_stats.html'
@@ -2308,10 +2308,11 @@ def print_html_summary(serial_infos, parallel_infos):
         boxplot_img = 'tasks_overall_stats_boxplot_imaging_pl_parallel.png'
         res += '<a href="{0}"><img src="{0}"/></a>'.format(boxplot_full)
         res += '<hr/>'
-        res += '<a href="{0}"><img src="{0}"/></a>'.format(boxplot_calib)
-        res += '<hr/>'
-        res += '<a href="{0}"><img src="{0}"/></a>'.format(boxplot_img)
-        res += '<hr/>'
+        if show_indiv_calib_img:
+            res += '<a href="{0}"><img src="{0}"/></a>'.format(boxplot_calib)
+            res += '<hr/>'
+            res += '<a href="{0}"><img src="{0}"/></a>'.format(boxplot_img)
+            res += '<hr/>'
         res += '</body>\n</html>'
 
         with open(oname, "w+") as ofile:
@@ -2319,7 +2320,7 @@ def print_html_summary(serial_infos, parallel_infos):
 
         return oname
 
-    def gen_subpage_summed_stages_n_tasks():
+    def gen_subpage_summed_stages_n_tasks(show_indiv_calib_img=False):
         """ returns the name of the page produced """
 
         oname = 'summed_runtimes_pl_stages_n_casa_tasks.html'
@@ -2337,11 +2338,11 @@ def print_html_summary(serial_infos, parallel_infos):
         res += '<hr/>'
         res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_full)
         res += '<hr/>'
-        
-        res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_calib)
-        res += '<hr/>'
-        res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_img)
-        res += '<hr/>'
+        if show_indiv_calib_img:
+            res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_calib)
+            res += '<hr/>'
+            res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_img)
+            res += '<hr/>'
         res += '</body>\n</html>'
 
         with open(oname, "w+") as ofile:
@@ -2368,7 +2369,7 @@ def print_html_summary(serial_infos, parallel_infos):
             print('Warning, could not find plot "task_*_per_pipeline_stage_summed_runtimes')
             box_plots = ''
 
-        title = 'Advanced or experimental plots - WIP'
+        title = 'Advanced or experimental plots'
         res = doc_hdr + '<html><head>\n'
         res += '<title></title>'.format(title)
         if path_css:
@@ -2985,6 +2986,8 @@ def main():
         args.make_per_pl_stage_barplots = True
         args.make_per_dataset_casa_tasks_barplots = True
         args.gen_html_summary = True
+        # TODO: maybe have an option to set show_indiv_calib_img=True and propagate it to
+        # the html functions that have that option
         
     if args.bundle_html:
         enable_bundle_html(args)
