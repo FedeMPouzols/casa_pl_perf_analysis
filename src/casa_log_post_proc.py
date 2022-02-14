@@ -1149,6 +1149,16 @@ def go_through_log_lines(logf):
                 if server_idx > mpi_server_cnt:
                     mpi_server_cnt = server_idx
 
+        mpi_server_str_casa6 = 'MPI Enabled at host '
+        if mpi_server_str_casa6 in line:
+            print('**** line: {}'.format(line))
+            # CASA 6+
+            mpi_server_re = '::MPIServer-(\d+)\s+MPI\s+Enabled\s+at\s+host\s+'
+            mpi_match = re.search(mpi_server_re, line)
+            if mpi_match:
+                server_idx = int(mpi_match.group(1))
+                if server_idx > mpi_server_cnt:
+                    mpi_server_cnt = server_idx
 
         # Handle begin/end task
         begin_task_re = '#\s+Begin Task:\s+(\w+)\s+#'
