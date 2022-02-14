@@ -73,9 +73,12 @@ class CASALogInfo(object):
                 from casa_logs_mous_props import mous_short_names
                 short_dataset_id = mous_short_names[self._mous]
             except (ImportError, KeyError):
-                if '_' not in self._project_tstamp:
-                    raise RuntimeError('Cannot find expected _ in project name: {}. Giving'
-                                       ' up'.format(self._project_tstamp))
+                if not self._project_tstamp or '_' not in self._project_tstamp:
+                    #short_dataset_id = 'unknown_id'
+                    self._project_tstamp = 'unknown_timestamp'
+                    # ? TODO
+                    #raise RuntimeError('Cannot find expected _ in project name: {}. Giving'
+                    #                   ' up'.format(self._project_tstamp))
                 short_dataset_id = self._project_tstamp.split('_')[0]
         except ImportError:
             pass
@@ -195,6 +198,8 @@ def version_equal_or_after(vers_str, major, minor, patch):
     """
     vers = vers_str.split('.')
     if len(vers) != 3:
+        print(' *** WARNING - Cannot parse CASA version, assuming this is CASA >=6... ***')
+        return True
         raise RuntimeError('Cannot parse CASA version: {0}'.format(vers_str))
     if isinstance(vers[2], str) and '-' in vers[2]:
         patch_dash = vers[2].split('-')
@@ -1085,7 +1090,8 @@ def go_through_log_lines(logf):
 
         # When running from EPPR,
         # Example Project+Timestamp ID: E2E5.1.00006.S_2017_09_12T19_54_03.778
-        eppr_rawdir_re = "INFO\s+::casa\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/"
+        #eppr_rawdir_re = "INFO\s+.+\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/"
+        eppr_rawdir_re = "\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/"
         if 'Working directory:' in line:
             print (' * Found EPPR working dir line ' + line)
             rawdir_match = eppr_rawdir_re = re.search(eppr_rawdir_re, line)
@@ -1125,6 +1131,13 @@ def go_through_log_lines(logf):
             version_match = re.search(version_re, line)
             if version_match:
                 casa_version = version_match.group(1).strip()
+        # version_re_6_0_tmp = 'casaVersion\s+=\s+([0-9A-Za-z\t ._\-]+)'
+        # if 'casaVersion' in line:
+        #     print('........... trying casaVersion')
+        #     version_match = re.search(version_re_6_0_tmp, line)
+        #     if version_match:
+        #         print(' *** Note: got version from casaVersion - this needs revisiting ***')
+        #         casa_version = version_match.group(1).strip()
 
         # check mpi
         mpi_server_str = '::casa::MPIServer-'
