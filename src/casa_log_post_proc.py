@@ -1116,7 +1116,10 @@ def go_through_log_lines(logf):
                 print(' * Found MOUS dir: {0}'.format(mous_dir))
 
         # example: pipeline::pipeline::casa        Pipeline version 40738 (trunk) running on zuul03
-        machine_re = 'running on\s+(\w+)'
+        # This is too constraining when considering all ARCS naming conventions
+        # (example_ arc-pl-proc09):
+        #    machine_re = 'running on\s+(\w+)'
+        machine_re = 'running on\s+(.+)'
         if 'Pipeline version' in line and (
                 not 'MPIServer' in line and 'running on' in line):
            machine_match = re.search(machine_re, line)
