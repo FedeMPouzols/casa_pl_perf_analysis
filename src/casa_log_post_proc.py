@@ -195,10 +195,12 @@ def version_equal_or_after(vers_str, major, minor, patch):
     usage: version_equal_or_after(5,4,0) to know if it was >= 5.4.0
     If the version string has a build -xxx, for example: 5.6.1-3, it is ignored for the
     purpose of the version comparison.
+
+    Pipeline official tarball example: "CASA Version PIPELINE 6.7.3.11"
     """
-    vers = vers_str.split('.')
-    if len(vers) != 3:
-        print(' *** WARNING - Cannot parse CASA version, assuming this is CASA >=6... ***')
+    vers = vers_str.split("-")[-1].split('.')
+    if len(vers) < 3 or len(vers) > 4:
+        print(f' *** WARNING - Cannot parse CASA version, assuming this is CASA >=6... ({vers=})***')
         return True
         raise RuntimeError('Cannot parse CASA version: {0}'.format(vers_str))
     if isinstance(vers[2], str) and '-' in vers[2]:
@@ -1090,7 +1092,7 @@ def go_through_log_lines(logf):
 
         # When running from EPPR,
         # Example Project+Timestamp ID: E2E5.1.00006.S_2017_09_12T19_54_03.778
-        #eppr_rawdir_re = "INFO\s+.+\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/"
+        # (was eppr_rawdir_re = "INFO\s+.+\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/")
         eppr_rawdir_re = "\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/"
         if 'Working directory:' in line:
             print (' * Found EPPR working dir line ' + line)
@@ -1133,7 +1135,8 @@ def go_through_log_lines(logf):
         if 'CASA Version' in line and 'MPIServer' not in line:
             version_match = re.search(version_re, line)
             if version_match:
-                casa_version = version_match.group(1).strip()
+                # For convenience to use in file names, strings, space=>_
+                casa_version = version_match.group(1).strip().replace(' ', '-')
         # version_re_6_0_tmp = 'casaVersion\s+=\s+([0-9A-Za-z\t ._\-]+)'
         # if 'casaVersion' in line:
         #     print('........... trying casaVersion')
@@ -1248,6 +1251,7 @@ def go_through_log_lines(logf):
             equiv_match = re.search(stage_equiv_call_re, line)
             if equiv_match:
                 equiv_call_str = equiv_match.group(1)
+                # TODO: this comparison is needed only once
                 if not version_equal_or_after(casa_version,
                                               *casa_version_equiv_call_change):
                     pipe_stages_current_equiv_call = equiv_call_str
