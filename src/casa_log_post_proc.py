@@ -446,7 +446,7 @@ def make_casa_tasks_table_file(out_fname, run_infos, rows, columns, cell_texts):
 
         time_others = datetime.timedelta(seconds=rinfo._total_time -
                                          rinfo._total_time_casa_tasks)
-        if 'serial' is run_type or idx < 1:
+        if 'serial' == run_type or idx < 1:
             info_text = ('{0}\n{1}\n{2}\n{3}'.format(run_type,
                                                      datetime.timedelta(
                                                          seconds=rinfo._total_time),
