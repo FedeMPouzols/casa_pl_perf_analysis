@@ -161,7 +161,10 @@ class CASATaskAggLogInfo(object):
             self._taccum_pipe_stages[pipe_stages_current] += task_runtime
 
         stage_idx = int(pipe_stages_current)
-        if stage_idx >= 23:
+        # if stage_idx >= 23:
+        # This should no longer be used elsewhere, but anyway doing an awful increase
+        # to 27 so that it is not too misleading.
+        if stage_idx >= 27:
             self._taccum_imaging_23_ += task_runtime
         else:
             self._taccum_calib_1_22 += task_runtime
@@ -1245,10 +1248,22 @@ def go_through_log_lines(logf):
         # To know what's the current 'equivalent CASA call'
         # Looking for example for:
         # 2017-10-05 12:51:50     INFO    hifa_importdata::pipeline.infrastructure.basetask::@cvpost065:MPIClient Equivalent CASA call: hifa_importdata(vis=['uid___A002_Xc3412f_X31e1'], session=['session_1'])
-        stage_equiv_call_str = 'Equivalent CASA call:'
-        stage_equiv_call_re = stage_equiv_call_str + '\s+([a-zA-Z_]+)\('
-        if stage_equiv_call_str in line and 'pipeline.infrastructure.basetask' in line:
-            equiv_match = re.search(stage_equiv_call_re, line)
+        # Which in more recent times became:
+        # 026-02-06 11:25:47     INFO    pipeline::pipeline.infrastructure.basetask::casa        Equivalent Pipeline CLI call: hifa_wvrgcalflag()
+        older_stage_equiv_call_str = 'Equivalent CASA call:'
+        older_stage_equiv_call_re = older_stage_equiv_call_str + '\s+([a-zA-Z_]+)\('
+        newer_stage_equiv_call_str = "Equivalent Pipeline CLI call:"
+        newer_stage_equiv_call_re = newer_stage_equiv_call_str + '\s+([a-zA-Z_]+)\('
+        # stage_equiv_call_re = stage_equiv_call_str + '([a-zA-Z]+_[a-zA-Z]+)\('
+        if (older_stage_equiv_call_str in line or newer_stage_equiv_call_str in line) and 'pipeline.infrastructure.basetask' in line:
+            if older_stage_equiv_call_str in line:
+                effective_stage_equiv_call_re = older_stage_equiv_call_re
+            elif newer_stage_equiv_call_str in line:
+                effective_stage_equiv_call_re =	newer_stage_equiv_call_re
+            else:
+                raise RuntimeError(f"Inconsistency here, {line=}, {older_stage_equiv_call_str=}, {newer_stage_equiv_call_str=}")
+
+            equiv_match = re.search(effective_stage_equiv_call_re, line)
             if equiv_match:
                 equiv_call_str = equiv_match.group(1)
                 # TODO: this comparison is needed only once
