@@ -1151,8 +1151,11 @@ def go_through_log_lines(logf):
         # check mpi
         mpi_server_str = '::casa::MPIServer-'
         if mpi_server_str in line and 'CASA' in line:
-            mpi_server_re = 'INFO\s+::casa::MPIServer-(\d+)\s+CASA\s+Version\s+'
-            mpi_match = re.search(mpi_server_re, line)
+            newer_mpi_server_re = 'INFO\s+::casa::MPIServer-(\d+)\s+MPI\s+Enabled\s+at\s+host'
+            mpi_match = re.search(newer_mpi_server_re, line)
+            if not mpi_match:
+                older_mpi_server_re = 'INFO\s+::casa::MPIServer-(\d+)\s+CASA\s+Version\s+'
+                mpi_match = re.search(older_mpi_server_re, line)
             if mpi_match:
                 server_idx = int(mpi_match.group(1))
                 if server_idx > mpi_server_cnt:
@@ -1160,7 +1163,7 @@ def go_through_log_lines(logf):
 
         mpi_server_str_casa6 = 'MPI Enabled at host '
         if mpi_server_str_casa6 in line:
-            print('**** line: {}'.format(line))
+            print('*** Found MPI server line: {}'.format(line.strip()))
             # CASA 6+
             mpi_server_re = '::MPIServer-(\d+)\s+MPI\s+Enabled\s+at\s+host\s+'
             mpi_match = re.search(mpi_server_re, line)
