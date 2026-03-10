@@ -16,10 +16,10 @@ SECS_TO_DAYS = SECS_TO_HOURS*24
 
 # TODO: get rid of this old stuff
 # For CASA 5.2, 5.3
-LAST_CALIB_STAGE = 22
+##LAST_CALIB_STAGE = 22
 # For CASA 5.4
-#LAST_CALIB_STAGE = 23
-
+###LAST_CALIB_STAGE = 23
+LAST_CALIB_STAGE = 27
 
 class Struct:
     """
@@ -1329,9 +1329,18 @@ def do_per_pl_stage_barplots(info):
                              metric_total_minus_tasks],
                             legends=['all other CASA tasks',
                                      'importasdm', 'plotbandpass',
-                                     'gaincal', 'appycal', 'plotms', 'flagdata', 'tclean',
+                                     'gaincal', 'applycal', 'plotms', 'flagdata', 'tclean',
                                      'Outside CASA tasks']
     )
+
+def project_tstamp_to_short_proj_name(project_tstamp: str) -> str:
+    if "___" in project_tstamp:
+        # extended format, like: pl_test_run_cvpost027_20260108T223638_028555593___E2E5.1.00011.S_2026_01_08T15_02_35.356
+        return project_tstamp.split('___')[-1].split("_")[0]
+    else:
+        # like E2E5.1.00011.S_2026_01_08T15_02_35.356
+        return project_tstamp.split('_')[0]
+
     
 # gen_pl_stages_barplots
 def plot_pl_stages_barplots(run_info, stages, stage_names,
@@ -1373,7 +1382,9 @@ def plot_pl_stages_barplots(run_info, stages, stage_names,
         get_lines = lambda bars: [b[0] for b in bars]
         # reversed because the first is the lowest in the stacked bars,
         # reverse will put then the first at the bottom of the legend lines
-        leg = plt.legend(reversed(get_lines(bars)), reversed(legends), loc='upper center', 
+        legend_x = list(reversed(get_lines(bars)))
+        legend_y = list(reversed(legends))
+        leg = plt.legend(legend_x, legend_y, loc='upper center',
                          prop={'size': FONTSIZE_TITLE})
         leg.get_frame().set_edgecolor('k')
 
@@ -1393,7 +1404,7 @@ def plot_pl_stages_barplots(run_info, stages, stage_names,
     # except KeyError:
     #     short_name = run_info['_project_tstamp'].split('_')[0]
     # TODO: nope, forget old short names
-    short_name = run_info['_project_tstamp'].split('_')[0]
+    short_name = project_tstamp_to_short_proj_name(run_info['_project_tstamp'])
 
     mous_size = get_asdms_size(mous)
 
@@ -1419,7 +1430,8 @@ def do_casa_tasks_barplot(info, name_suffix=''):
 
     ctasks_time = format_pl_runtime(info['_total_time_casa_tasks'])
     title_long = 'Runtime of CASA tasks (total within CASA tasks: {})'.format(ctasks_time)
-    proj = info['_project_tstamp'].split('_')[0]
+    #proj = info['_project_tstamp'].split('_')[0]
+    proj = project_tstamp_to_short_proj_name(info['_project_tstamp'])
     mous = info['_mous']
     parallel = info['_mpi_servers']
     suffix = 'proj_{0}_MOUS_{1}_{2}'.format(proj, mous, parallel)
@@ -1860,23 +1872,31 @@ def show_basic_stats(serial_infos, par_infos, multi_par_infos, show=True):
 
     # convenience: turn into list and sort by project name:
     par_infos = [info for _key, info in par_infos.items()]
-    par_infos.sort(key=lambda x: x['_project_tstamp'], reverse=False)
+    par_infos.sort(key=lambda x: project_tstamp_to_short_proj_name(x['_project_tstamp']), reverse=False)
     par_runtimes = [info['_total_time'] for info in par_infos]
 
     # par_runtimes
     total_tasks = [info['_total_time_casa_tasks'] for info in par_infos]
     total_outside_tasks = [info['_total_time'] - info['_total_time_casa_tasks'] for info in par_infos]
-    names_infos = [info['_project_tstamp'][:15] for info in par_infos]
+    names_infos = [project_tstamp_to_short_proj_name(info['_project_tstamp'])[:15] for info in par_infos]
     exclude_first = False
     if exclude_first:
         total_tasks = total_tasks[1:]
         total_outside_tasks = total_outside_tasks[1:]
         par_runtimes = par_runtimes[1:]
     print(' * Total runtime: {0}'.format(sum(par_runtimes)))
+    if len(par_runtimes) > 0:
+        ratio_inside_tasks = 100.0*sum(total_tasks)/sum(par_runtimes)
+    else:
+        ratio_inside_tasks = 0
     print('* Total inside tasks: {0} ({1}%), list: {2}'.
-          format(sum(total_tasks), 100.0*sum(total_tasks)/sum(par_runtimes),  total_tasks))
+          format(sum(total_tasks), ratio_inside_tasks,  total_tasks))
+    if len(par_runtimes) > 0:
+        ratio_outside_tasks = 100.0*sum(total_outside_tasks)/sum(par_runtimes)
+    else:
+        ratio_outside_tasks = 0
     print('* Total ouside tasks: {0} ({1}%), list: {2}'.
-          format(sum(total_outside_tasks), 100.0*sum(total_outside_tasks)/sum(par_runtimes), total_outside_tasks))
+          format(sum(total_outside_tasks), ratio_outside_tasks, total_outside_tasks))
 
     import numpy as np
     indiv_ratios = 100.0*np.divide(np.array(total_tasks), np.array(par_runtimes))
@@ -2253,7 +2273,15 @@ def print_html_summary(serial_infos, parallel_infos):
         return txt
 
     def gen_overall_histograms():
-        histo_runtimes = 'plot_pipeline_test_datasets_histo_runtimes_parallel.png'
+        import os
+        histo_runtimes_filename_serial = 'plot_pipeline_test_datasets_histo_runtimes_serial.png'
+        histo_runtimes_filename_parallel = 'plot_pipeline_test_datasets_histo_runtimes_parallel.png'
+        if os.path.isfile(histo_runtimes_filename_parallel):
+            histo_runtimes_filename = histo_runtimes_filename_parallel
+        else:
+            histo_runtimes_filename = histo_runtimes_filename_serial
+
+        histo_runtimes = histo_runtimes_filename
         histo_sizes = 'plot_pipeline_test_datasets_histo_sizes.png'
         res = '<p>'
         res += '<a href="{0}"><img width="40%" src="{0}"/></a>'.format(histo_runtimes)
@@ -2303,9 +2331,13 @@ def print_html_summary(serial_infos, parallel_infos):
         res += '</head>\n'
         res += '<body>\n'
         res += '<h1>{}</h1>\n'.format(title)
-        boxplot_full = 'tasks_overall_stats_boxplot_full_pl_parallel.png'
-        boxplot_calib = 'tasks_overall_stats_boxplot_calib_pl_parallel.png'
-        boxplot_img = 'tasks_overall_stats_boxplot_imaging_pl_parallel.png'
+        if os.path.isfile("tasks_overall_stats_boxplot_full_pl_parallel.png"):
+            plots_suffix = "parallel"
+        else:
+            plots_suffix = "serial"
+        boxplot_full = f'tasks_overall_stats_boxplot_full_pl_{plots_suffix}.png'
+        boxplot_calib = f'tasks_overall_stats_boxplot_calib_pl_{plots_suffix}.png'
+        boxplot_img = f'tasks_overall_stats_boxplot_imaging_pl_{plots_suffix}.png'
         res += '<a href="{0}"><img src="{0}"/></a>'.format(boxplot_full)
         res += '<hr/>'
         if show_indiv_calib_img:
@@ -2330,10 +2362,14 @@ def print_html_summary(serial_infos, parallel_infos):
         res += '</head>\n'
         res += '<body>\n'
         res += '<h1>{}</h1>\n'.format(title)
-        stages = 'stages_pl_summed_runtime_barplot_runs_full_pl_parallel.png'
-        tasks_full = 'tasks_summed_runtime_barplot_runs_full_pl_parallel.png'
-        tasks_calib = 'tasks_summed_runtime_barplot_runs_calib_pl_parallel.png'
-        tasks_img = 'tasks_summed_runtime_barplot_runs_imaging_pl_parallel.png'
+        if os.path.isfile("stages_pl_summed_runtime_barplot_runs_full_pl_parallel.png"):
+            plots_suffix = "parallel"
+        else:
+            plots_suffix = "serial"
+        stages = f'stages_pl_summed_runtime_barplot_runs_full_pl_{plots_suffix}.png'
+        tasks_full = f'tasks_summed_runtime_barplot_runs_full_pl_{plots_suffix}.png'
+        tasks_calib = f'tasks_summed_runtime_barplot_runs_calib_pl_{plots_suffix}.png'
+        tasks_img = f'tasks_summed_runtime_barplot_runs_imaging_pl_{plots_suffix}.png'
         res += '<a href="{0}"><img src="{0}"/></a>'.format(stages)
         res += '<hr/>'
         res += '<a href="{0}"><img src="{0}"/></a>'.format(tasks_full)
@@ -2451,16 +2487,16 @@ def print_html_summary(serial_infos, parallel_infos):
     def gen_table_datasets(run_infos):
         res = '<table class="datasets-tbl">\n<thead>\n'
         res += ('<tr><th>Project</th> <th>MOUS</th> <th># EBs</th> <th>ASDM size (GB, total)</th> <th>start</th> '
-                '<th>runtime</th> <th>stages run</th> <th>CASA version</th> <th>machine</th>'
+                '<th>runtime</th> <th>stages run</th> <th>CASA version</th> <th>node</th>'
                 '<th>processes</th> </tr>')
         res += '</thead>\n'
         res += '<tbody>\n'
         def sort_key_func(key_val):
-            return key_val[1]['_project_tstamp']
+            return project_tstamp_to_short_proj_name(key_val[1]['_project_tstamp'])
         
         for uid, info in sorted(run_infos.items(), key=sort_key_func):
             res += '<tr>'
-            res += '<td>{}</td>'.format(info['_project_tstamp'].split('_')[0])
+            res += '<td>{}</td>'.format(project_tstamp_to_short_proj_name(info['_project_tstamp']))
             subpage_name = indiv_run_subpage_name(info)
             res += '<td><a href="{0}">{1}</a></td>'.format(subpage_name, info['_mous'])
             res += '<td>{0}</td>'.format(casa_logs_mous_props.ebs_cnt.get(uid, 0))
@@ -2512,7 +2548,7 @@ def print_html_summary(serial_infos, parallel_infos):
                 
             res = doc_hdr + '<html><head>\n'
             res += ('<title>MOUS {0} - execution {1}</title>'.
-                    format(info['_mous'], info['_project_tstamp']))
+                    format(info['_mous'], project_tstamp_to_short_proj_name(info['_project_tstamp'])))
             if path_css:
                 res += '<link rel="stylesheet" type="text/css" href="{}">\n'.format(
                     os.path.join('..', path_css))
@@ -2525,7 +2561,7 @@ def print_html_summary(serial_infos, parallel_infos):
                     '<th>CASA version</th>'
                     '<th>Project</th> <th>MOUS</th>'
                     '<th> # EBs</th> <th>Size of all ASDMs (GB)</th>'
-                    '<th>Total runtime</th> <th>Machine</th>'
+                    '<th>Total runtime</th> <th>node</th>'
                     '</tr>\n'
                     '</thead>\n'
             )
@@ -2536,7 +2572,7 @@ def print_html_summary(serial_infos, parallel_infos):
                     '<td>{}</td> <td>{:.1f}</td>'
                     '<td>{}</td> <td>{}</td>'
                     '</tr>\n'.format(info['_casa_version'],
-                                     info['_project_tstamp'].split('_')[0], mous,
+                                     project_tstamp_to_short_proj_name(info['_project_tstamp']), mous,
                                      casa_logs_mous_props.ebs_cnt.get(mous, 0),
                                      get_asdms_size(mous),
                                      format_pl_runtime(float(info['_total_time'])),
@@ -2584,10 +2620,11 @@ def print_html_summary(serial_infos, parallel_infos):
                  'runs that used different ALMA datasets.')
         html+= '</p>\n'
 
-        first_start = min([info['_first_tstamp'] for _key, info in parallel_infos.items()])
-        last_end = max([info['_last_tstamp'] for _key, info in parallel_infos.items()])
-        casa_versions = [info['_casa_version'] for _key, info in parallel_infos.items()]
-        machines = set([info['_run_machine'] for _key, info in parallel_infos.items()])
+        relevant_infos = parallel_infos if parallel_infos else serial_infos
+        first_start = min([info['_first_tstamp'] for _key, info in relevant_infos.items()])
+        last_end = max([info['_last_tstamp'] for _key, info in relevant_infos.items()])
+        casa_versions = [info['_casa_version'] for _key, info in relevant_infos.items()]
+        machines = set([info['_run_machine'] for _key, info in relevant_infos.items()])
         oldest_casa = min(casa_versions)
         oldest_freq = casa_versions.count(oldest_casa)
         newest_casa = max(casa_versions)
@@ -2659,7 +2696,7 @@ def print_html_summary(serial_infos, parallel_infos):
 
         # html += '<hr/>\n'
         html += '<h2>Individual runs:</h2>\n'
-        html += gen_table_datasets(parallel_infos)
+        html += gen_table_datasets(relevant_infos)
 
         import platform
         html += '\n<!-- auto-generated by {} on {}, tstamp: {} -->\n'.format(
@@ -2775,11 +2812,15 @@ def produce_datasets_histograms(serial_infos, parallel_infos):
         print(' *** NOTICE: Not producing histogram of serial times - no serial runs available')
 
     print('Plotting histo of parallel times: {0}'.format(times_par))
-    plot_histo(times_par, bin_width=bin_width, ticks_dist=24, xlabel='Run time (hours)',
-               ylabel='Count of datasets',
-               title='Histogram of pipeline run times (bins: {0} hours)'.
-               format(bin_width),
-               filename='plot_pipeline_test_datasets_histo_runtimes_parallel.png')
+    if len(times_par) > 0:
+        plot_histo(times_par, bin_width=bin_width, ticks_dist=24, xlabel='Run time (hours)',
+                   ylabel='Count of datasets',
+                   title='Histogram of pipeline run times (bins: {0} hours)'.
+                   format(bin_width),
+                   filename='plot_pipeline_test_datasets_histo_runtimes_parallel.png')
+    else:
+        print(' *** NOTICE: Not producing histogram of parallel times - no parallel runs available')
+
 
 def find_serial_call_by_imgname(task_details_params, imgname):
     for det in task_details_params:
@@ -2788,7 +2829,8 @@ def find_serial_call_by_imgname(task_details_params, imgname):
             return det
 
     return None
-    
+
+
 def do_beam_stats(serial_infos, parallel_infos):
     accum = []
 
