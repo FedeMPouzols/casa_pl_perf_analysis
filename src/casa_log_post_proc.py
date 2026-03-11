@@ -48,7 +48,7 @@ class CASALogInfo(object):
         self._project_tstamp = project_tstamp
         self._mous = mous
         self._first_eb_uid = first_eb_uid
-        self._eb_uid_list = eb_list
+        self._eb_uid_list = eb_uid_list
         self._mpi_servers = mpi_server_cnt
         self._total_time = total_time
         self._total_time_casa_tasks = total_time_casa_tasks
