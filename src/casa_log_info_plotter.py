@@ -1485,6 +1485,20 @@ def do_summed_runtime_plots(infos, name_suffix):
     print(' ** Producing plots of overall runtime (runtime summed up) per CASA'
           'task and pipeline stage. Name suffix {0}'.format(name_suffix))
 
+    def find_max_stage_number_calib_img(run_info) -> tuple[int, int]:
+        exportdata_numbers = []
+        for stage in run_info["_pipe_stages_counter"]:
+            stage_info = run_info["_pipe_stages_counter"][stage]
+            if stage_info["_equiv_call"] == "hifa_exportdata":
+                exportdata_numbers.append(int(stage))
+
+        max_calib = min(exportdata_numbers) # 28/35
+        max_img = max(exportdata_numbers) # 48
+
+        print(f" > {run_info['project_tstamp']=}, found {max_calib=}, {max_img=}")
+        return max_calib, max_img
+
+
     tasks_full_time = dict()
     tasks_calib_time = dict()
     tasks_imaging_time = dict()
@@ -1511,6 +1525,8 @@ def do_summed_runtime_plots(infos, name_suffix):
             # This is calibration only? Or broken/incomplete runs?
             max_calib = len_stg
             max_img = 0
+        else:
+            max_calib, max_img = find_max_stage_number_calib_img(run_info)
 
         
         # print('do_summed_runtime_plots(), mous: {0}'.format(run_info['_mous']))
@@ -2274,12 +2290,13 @@ def print_html_summary(serial_infos, parallel_infos):
 
     def gen_overall_histograms():
         import os
+
         histo_runtimes_filename_serial = 'plot_pipeline_test_datasets_histo_runtimes_serial.png'
         histo_runtimes_filename_parallel = 'plot_pipeline_test_datasets_histo_runtimes_parallel.png'
-        if os.path.isfile(histo_runtimes_filename_parallel):
-            histo_runtimes_filename = histo_runtimes_filename_parallel
-        else:
+        if os.path.isfile(histo_runtimes_filename_serial):
             histo_runtimes_filename = histo_runtimes_filename_serial
+        else:
+            histo_runtimes_filename = histo_runtimes_filename_parallel
 
         histo_runtimes = histo_runtimes_filename
         histo_sizes = 'plot_pipeline_test_datasets_histo_sizes.png'
@@ -2969,7 +2986,7 @@ def main_info_plotter(input_dir, make_general_plots=False,
         do_beam_stats(serial_infos, parallel_infos)
 
     if make_datasets_histos:
-        produce_datasets_histograms(serial_infos, parallel_infos)       
+        produce_datasets_histograms(serial_infos, parallel_infos)
 
 def main():
     import argparse
