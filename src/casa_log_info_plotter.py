@@ -2517,7 +2517,8 @@ def print_html_summary(serial_infos, parallel_infos):
             subpage_name = indiv_run_subpage_name(info)
             res += '<td><a href="{0}">{1}</a></td>'.format(subpage_name, info['_mous'])
             res += '<td>{0}</td>'.format(casa_logs_mous_props.ebs_cnt.get(uid, 0))
-            res += '<td>{0:.1f}</td>'.format(get_asdms_size(uid))
+            #res += '<td>{0:.1f}</td>'.format(get_asdms_size(uid))
+            res += '<td>{0:.1f}</td>'.format(len(info['eb_uid_list']))
             res += '<td>{}</td>'.format(info['_first_tstamp'])
             res += '<td>{}</td>'.format(format_pl_runtime(float(info['_total_time'])))
             res += '<td>{}</td>'.format(find_stages_run(info))
@@ -2590,7 +2591,8 @@ def print_html_summary(serial_infos, parallel_infos):
                     '<td>{}</td> <td>{}</td>'
                     '</tr>\n'.format(info['_casa_version'],
                                      project_tstamp_to_short_proj_name(info['_project_tstamp']), mous,
-                                     casa_logs_mous_props.ebs_cnt.get(mous, 0),
+                                     #casa_logs_mous_props.ebs_cnt.get(mous, 0),
+                                     len(info['eb_uid_list']),
                                      get_asdms_size(mous),
                                      format_pl_runtime(float(info['_total_time'])),
                                      info['_run_machine'])
