@@ -2979,14 +2979,15 @@ def main_info_plotter(input_dir, make_general_plots=False,
 
     show_basic_stats(serial_infos, parallel_infos, multicore_parallel_infos)
 
+    if make_datasets_histos:
+        produce_datasets_histograms(serial_infos, parallel_infos)
+
     if gen_html_summary:
         print_html_summary(serial_infos, parallel_infos)
 
     if make_beam_stats:
         do_beam_stats(serial_infos, parallel_infos)
 
-    if make_datasets_histos:
-        produce_datasets_histograms(serial_infos, parallel_infos)
 
 def main():
     import argparse
