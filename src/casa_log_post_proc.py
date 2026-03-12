@@ -36,7 +36,7 @@ class CASALogInfo(object):
         self._total_time_casa_tasks = 0
 
     def __init__(self, log_fname, run_machine, casa_version, first_tstamp, last_tstamp,
-                 project_tstamp, mous, first_eb_uid, eb_uid_list, mpi_server_cnt, casa_tasks_counter,
+                 project_tstamp, mous, first_eb_uid, eb_uids_all, mpi_server_cnt, casa_tasks_counter,
                  pipe_tasks_counter, pipe_stages_counter,
                  special_tasks_counter, tasks_details_params,
                  total_time, total_time_casa_tasks):
@@ -48,7 +48,7 @@ class CASALogInfo(object):
         self._project_tstamp = project_tstamp
         self._mous = mous
         self._first_eb_uid = first_eb_uid
-        self._eb_uid_list = eb_uid_list
+        self._eb_uids_all = eb_uids_all
         self._mpi_servers = mpi_server_cnt
         self._total_time = total_time
         self._total_time_casa_tasks = total_time_casa_tasks
@@ -1101,7 +1101,7 @@ def go_through_log_lines(logf):
                     asdms_cslist = asdms_all_text.split(",")
                     asdms_cslist = [asdm.strip(" ").strip("'") for asdm in asdms_cslist]
                     print(f" * Found full list of ASDMs: {asdms_cslist=}")
-                    eb_uid_list = asdms_cslist
+                    eb_uids_all = asdms_cslist
 
 
         # When running from EPPR,
@@ -1337,7 +1337,7 @@ def go_through_log_lines(logf):
     elapsed_secs = (last_tstamp - first_tstamp).total_seconds()
     logi = CASALogInfo(os.path.realpath(logf.name), run_machine, casa_version,
                        first_tstamp, last_tstamp, proj_tstamp, mous_dir, first_eb_uid,
-                       eb_uid_list, mpi_server_cnt, casa_tasks_counter, pipe_tasks_counter,
+                       eb_uids_all, mpi_server_cnt, casa_tasks_counter, pipe_tasks_counter,
                        pipe_stages_counter, special_task_patterns,
                        tasks_details_params, elapsed_secs,
                        all_casa_tasks_accum)

@@ -2516,9 +2516,8 @@ def print_html_summary(serial_infos, parallel_infos):
             res += '<td>{}</td>'.format(project_tstamp_to_short_proj_name(info['_project_tstamp']))
             subpage_name = indiv_run_subpage_name(info)
             res += '<td><a href="{0}">{1}</a></td>'.format(subpage_name, info['_mous'])
-            res += '<td>{0}</td>'.format(casa_logs_mous_props.ebs_cnt.get(uid, 0))
-            #res += '<td>{0:.1f}</td>'.format(get_asdms_size(uid))
-            res += '<td>{0:.1f}</td>'.format(len(info['eb_uid_list']))
+            res += '<td>{0}</td>'.format(len(info['_eb_uids_all']))
+            res += '<td>{0:.1f}</td>'.format(get_asdms_size(uid))
             res += '<td>{}</td>'.format(info['_first_tstamp'])
             res += '<td>{}</td>'.format(format_pl_runtime(float(info['_total_time'])))
             res += '<td>{}</td>'.format(find_stages_run(info))
@@ -2579,7 +2578,7 @@ def print_html_summary(serial_infos, parallel_infos):
                     '<th>CASA version</th>'
                     '<th>Project</th> <th>MOUS</th>'
                     '<th> # EBs</th> <th>Size of all ASDMs (GB)</th>'
-                    '<th>Total runtime</th> <th>node</th>'
+                    '<th>Total run time</th> <th>node</th>'
                     '</tr>\n'
                     '</thead>\n'
             )
@@ -2592,7 +2591,7 @@ def print_html_summary(serial_infos, parallel_infos):
                     '</tr>\n'.format(info['_casa_version'],
                                      project_tstamp_to_short_proj_name(info['_project_tstamp']), mous,
                                      #casa_logs_mous_props.ebs_cnt.get(mous, 0),
-                                     len(info['eb_uid_list']),
+                                     len(info['_eb_uids_all']),
                                      get_asdms_size(mous),
                                      format_pl_runtime(float(info['_total_time'])),
                                      info['_run_machine'])
@@ -2668,7 +2667,7 @@ def print_html_summary(serial_infos, parallel_infos):
         )
         html += '</table>\n'
 
-        html += '<h2>Datasets - runtime, input size</h2>\n'
+        html += '<h2>Datasets - run time, input size</h2>\n'
         overall_histos = gen_overall_histograms()
 
         html += overall_histos
@@ -2680,7 +2679,7 @@ def print_html_summary(serial_infos, parallel_infos):
         subpage_adv = gen_subpage_advanced_plots()
         html += '<table class="links-tbl">\n<thead>\n'
 
-        to_summed = '<a href="{}">===> Summed runtimes of pipeline stages and CASA tasks</a>'.format(
+        to_summed = '<a href="{}">===> Summed run times of pipeline stages and CASA tasks</a>'.format(
             subpage_summed)
         to_overall = '<a href="{}">===> Overall CASA tasks statistics</a>'.format(
             subpage_overall_stats)
@@ -2705,7 +2704,7 @@ def print_html_summary(serial_infos, parallel_infos):
         
 
         
-        # html += ('<p><a href="{0}">===> Summed runtimes of pipeline stages and CASA tasks</a>'
+        # html += ('<p><a href="{0}">===> Summed run times of pipeline stages and CASA tasks</a>'
         #          '</p>\n'.format(subpage_summed))
         # html += ('<p><a href="{0}">===> Overall CASA tasks statistics</a></p>\n'.
         #          format(subpage_overall_stats))
@@ -3007,7 +3006,7 @@ def main():
                         'all usual plots and the html pages that display them.')
     parser.add_argument('--make-general-plots', action='store_true')
     parser.add_argument('--make-datasets-histos', action='store_true',
-                        help='histograms of dataset sizes and runtimes')
+                        help='histograms of dataset sizes and run times')
     parser.add_argument('--make-summed-tasks-stages-plots', action='store_true',
                         help='boxplots of summed up times of  CASA tasks and '
                         'pipeline stages')
@@ -3024,7 +3023,7 @@ def main():
                         help='simple barplots of time per CASA task. This '
                         'produces one plot per dataset/execution')
     parser.add_argument('--make-multicore-plots', action='store_true',
-                        help='barplots of runtime per CASA task for a range of '
+                        help='barplots of run time per CASA task for a range of '
                         'number of cores')
     parser.add_argument('--make-percentages-plots', action='store_true')
     parser.add_argument('--make-tclean-plots', action='store_true')
