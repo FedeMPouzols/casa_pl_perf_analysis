@@ -1111,8 +1111,7 @@ def gen_tclean_csv_exp(serial_x, serial_y, parallel_x, parallel_y,
         writer = csv.writer(csvf, delimiter=',', quotechar='\'', quoting=csv.QUOTE_MINIMAL)
 
         for idx, val in enumerate(serial_x):
-            #size = mous_sizes[point_tags_serial[idx]]  ###
-            size = -1
+            size = get_mous_asdm_size(point_tags_serial[ids])
             row_vals = [0, serial_x[idx], serial_y[idx]]
             for name in interest_par_names:
                 row_vals.append(interest_pars[name][idx])
@@ -1121,7 +1120,7 @@ def gen_tclean_csv_exp(serial_x, serial_y, parallel_x, parallel_y,
 
         idx0 = len(serial_x)
         for idx, val in enumerate(parallel_x):
-            #size = mous_sizes[point_tags_parallel[idx]]  ###
+            size = get_mous_asdm_size(point_tags_serial[ids])
             size = -1
             row_vals = [mpi_servers[idx], parallel_x[idx], parallel_y[idx]]
             for name in interest_par_names:
@@ -1178,8 +1177,7 @@ def do_casa_tasks_percentage_serial_parallel_plot(serial_infos, parallel_infos,
         if 'time' == x_axis:
             serial_x.append(float(obj['_total_time']) / time_div)
         elif 'mous_size' == x_axis:
-            # serial_x.append(mous_sizes[mous])  ###
-            serial_x.append(-1)
+            serial_x.append(get_mous_asdms_size(obj["_mous"]))
         serial_y.append(metric_val)
 
     for key, obj in parallel_infos.items():
@@ -1202,8 +1200,7 @@ def do_casa_tasks_percentage_serial_parallel_plot(serial_infos, parallel_infos,
         if 'time' == x_axis:
             serial_metric_val = serial_by_mous[mous]['_total_time'] / time_div
         elif 'mous_size' == x_axis:
-            # serial_metric_val = mous_sizes[mous]  ###
-            serial_metric_val = -1
+            serial_metric_val = get_mous_asdms_size(obj["_mous"])
 
         par_val_x = float(serial_metric_val)
         parallel_x.append(par_val_x)
