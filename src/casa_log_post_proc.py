@@ -69,20 +69,13 @@ class CASALogInfo(object):
         of cores/MPI servers.
         """
         short_dataset_id = ''
-        try:
-            try:
-                from casa_logs_mous_props import mous_short_names
-                short_dataset_id = mous_short_names[self._mous]
-            except (ImportError, KeyError):
-                if not self._project_tstamp or '_' not in self._project_tstamp:
-                    #short_dataset_id = 'unknown_id'
-                    self._project_tstamp = 'unknown_timestamp'
-                    # ? TODO
-                    #raise RuntimeError('Cannot find expected _ in project name: {}. Giving'
-                    #                   ' up'.format(self._project_tstamp))
-                short_dataset_id = self._project_tstamp.split('_')[0]
-        except ImportError:
-            pass
+        if not self._project_tstamp or '_' not in self._project_tstamp:
+            #short_dataset_id = 'unknown_id'
+            self._project_tstamp = 'unknown_timestamp'
+            # ? TODO
+            #raise RuntimeError('Cannot find expected _ in project name: {}. Giving'
+            #                   ' up'.format(self._project_tstamp))
+        short_dataset_id = self._project_tstamp.split('_')[0]
 
         return ('{0}_MOUS_{1}_mpi_{2}_host_{3}_casa_{4}_tstamp_{5}'.
                 format(short_dataset_id,
