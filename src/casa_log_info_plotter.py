@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
 import datetime
+import os
 
-from casa_logs_mous_props import mous_sizes, mous_short_names, get_asdms_size, ebs_cnt
-import casa_logs_mous_props
+from mous_asdm_sizes import get_mous_asdms_size
+
 
 too_verbose = False
 
@@ -67,7 +68,6 @@ def find_info_files(subdir):
     return [ifile for ifile in glob.glob(glob_pattern)]
 
 def format_pl_runtime(time_secs):
-    import datetime
     SECS_PER_MIN = float(60.)
     SECS_PER_HOUR = SECS_PER_MIN * 60.
     SECS_PER_DAY = SECS_PER_HOUR * 24.
@@ -1111,7 +1111,8 @@ def gen_tclean_csv_exp(serial_x, serial_y, parallel_x, parallel_y,
         writer = csv.writer(csvf, delimiter=',', quotechar='\'', quoting=csv.QUOTE_MINIMAL)
 
         for idx, val in enumerate(serial_x):
-            size = mous_sizes[point_tags_serial[idx]]
+            #size = mous_sizes[point_tags_serial[idx]]  ###
+            size = -1
             row_vals = [0, serial_x[idx], serial_y[idx]]
             for name in interest_par_names:
                 row_vals.append(interest_pars[name][idx])
@@ -1120,7 +1121,8 @@ def gen_tclean_csv_exp(serial_x, serial_y, parallel_x, parallel_y,
 
         idx0 = len(serial_x)
         for idx, val in enumerate(parallel_x):
-            size = mous_sizes[point_tags_parallel[idx]]
+            #size = mous_sizes[point_tags_parallel[idx]]  ###
+            size = -1
             row_vals = [mpi_servers[idx], parallel_x[idx], parallel_y[idx]]
             for name in interest_par_names:
                 row_vals.append(interest_pars[name][idx0 + idx])
@@ -1176,7 +1178,8 @@ def do_casa_tasks_percentage_serial_parallel_plot(serial_infos, parallel_infos,
         if 'time' == x_axis:
             serial_x.append(float(obj['_total_time']) / time_div)
         elif 'mous_size' == x_axis:
-            serial_x.append(mous_sizes[mous])
+            # serial_x.append(mous_sizes[mous])  ###
+            serial_x.append(-1)
         serial_y.append(metric_val)
 
     for key, obj in parallel_infos.items():
@@ -1199,7 +1202,8 @@ def do_casa_tasks_percentage_serial_parallel_plot(serial_infos, parallel_infos,
         if 'time' == x_axis:
             serial_metric_val = serial_by_mous[mous]['_total_time'] / time_div
         elif 'mous_size' == x_axis:
-            serial_metric_val = mous_sizes[mous]
+            # serial_metric_val = mous_sizes[mous]  ###
+            serial_metric_val = -1
 
         par_val_x = float(serial_metric_val)
         parallel_x.append(par_val_x)
@@ -1406,7 +1410,7 @@ def plot_pl_stages_barplots(run_info, stages, stage_names,
     # TODO: nope, forget old short names
     short_name = project_tstamp_to_short_proj_name(run_info['_project_tstamp'])
 
-    mous_size = get_asdms_size(mous)
+    mous_size = get_mous_asdms_size(run_info)
 
     fig.suptitle('{0}, MOUS: {1}, ASDM size: {2:.1f} GB'.
                  format(short_name, mous, float(mous_size)),
@@ -1495,7 +1499,7 @@ def do_summed_runtime_plots(infos, name_suffix):
         max_calib = min(exportdata_numbers) # 28/35
         max_img = max(exportdata_numbers) # 48
 
-        print(f" > {run_info['project_tstamp']=}, found {max_calib=}, {max_img=}")
+        print(f" > {run_info['_project_tstamp']=}, found {max_calib=}, {max_img=}")
         return max_calib, max_img
 
 
@@ -1845,7 +1849,6 @@ def get_total_runtimes_multicore(run_infos):
 
 def show_total_runtime_stats(runtimes):
     import numpy as np
-    import datetime
 
     if not runtimes:
         print (' * WARNING: no runtimes available!')
@@ -2069,13 +2072,13 @@ def plot_multicore_list_runs(run_infos, metric_lambdas,
     mous = run_infos[0]['_mous']
 
 
-    gen_csv_multicore_list_run(num_servers, sum_val, mous_short_names[mous], mous, ptype)
+    gen_csv_multicore_list_run(num_servers, sum_val, mous, mous, ptype)
     
     fig.suptitle('{0}, MOUS: {1}'.  # could add 'ASDM size: {2:.1f} GB' - mous_sizes[mous]
-                 format(mous_short_names[mous]),
+                 format(mous),
                  fontsize=FONTSIZE_TITLE, fontweight='bold')
     fig.savefig('plot_bars_runtime_{0}_parallel_multiple_cores_MOUS_{1}_{2}.png'.
-                format(ptype, mous_short_names[mous], mous))
+                format(ptype, mous, mous))
 
     plt.close()
 
@@ -2517,7 +2520,8 @@ def print_html_summary(serial_infos, parallel_infos):
             subpage_name = indiv_run_subpage_name(info)
             res += '<td><a href="{0}">{1}</a></td>'.format(subpage_name, info['_mous'])
             res += '<td>{0}</td>'.format(len(info['_eb_uids_all']))
-            res += '<td>{0:.1f}</td>'.format(get_asdms_size(uid))
+            agg_size = get_mous_asdms_size(info)
+            res += '<td>{0:.1f}</td>'.format(agg_size)
             res += '<td>{}</td>'.format(info['_first_tstamp'])
             res += '<td>{}</td>'.format(format_pl_runtime(float(info['_total_time'])))
             res += '<td>{}</td>'.format(find_stages_run(info))
@@ -2590,9 +2594,8 @@ def print_html_summary(serial_infos, parallel_infos):
                     '<td>{}</td> <td>{}</td>'
                     '</tr>\n'.format(info['_casa_version'],
                                      project_tstamp_to_short_proj_name(info['_project_tstamp']), mous,
-                                     #casa_logs_mous_props.ebs_cnt.get(mous, 0),
                                      len(info['_eb_uids_all']),
-                                     get_asdms_size(mous),
+                                     get_mous_asdms_size(info),
                                      format_pl_runtime(float(info['_total_time'])),
                                      info['_run_machine'])
             )
@@ -2778,16 +2781,12 @@ def produce_datasets_histograms(serial_infos, parallel_infos):
 
     max_time = 400
     for key, info in serial_infos.items():
-        # mous = key
-        mous = info['_mous']
-        try:
-            sizes.append(mous_sizes[mous])
-        except KeyError:
-                print(' WARNING: no size available for mous: {0}'.format(mous))
-                sizes.append(-1)
+        mous_size = get_mous_asdms_size(info)
+        sizes.append(mous_size)
 
         time = info['_total_time'] / SECS_TO_HOURS
         if time > max_time:
+            mous = info['_mous']
             print(' *** WARN WARN: very long time (in serial). Time: {0}. MOUS:'.
                   format(time, mous))
         times_serial.append(time)
@@ -2801,13 +2800,8 @@ def produce_datasets_histograms(serial_infos, parallel_infos):
         times_par.append(time)
 
     if not sizes:
-        for key, info in parallel_infos.items():
-            mous = info['_mous']
-            try:
-                sizes.append(mous_sizes[mous])
-            except KeyError:
-                print(' WARNING: no size available for mous: {0}'.format(mous))
-                sizes.append(-1)
+        for _key, info in parallel_infos.items():
+            agg_size = get_mous_asdms_size(info)
 
     # Histo of sizes
     bin_width = 5
