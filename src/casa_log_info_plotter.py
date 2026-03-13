@@ -2729,15 +2729,9 @@ def print_html_summary(serial_infos, parallel_infos):
 
     path_css = cp_css()
 
+    relevant_infos = parallel_infos if parallel_infos else serial_infos
     gen_main_page(serial_infos, parallel_infos, path_css)
-    
-    gen_per_run_pages(parallel_infos, path_css)
-
-    # old seria/parallel stuff
-    # html += '\n<p>Run time</p>\n'
-    # totals = gen_runtime_sum_section()
-    # html += totals
-
+    gen_per_run_pages(relevant_infos, path_css)
 
 
 def plot_histo(data_val, bin_width, ticks_dist, xlabel, ylabel, title, filename):
