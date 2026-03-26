@@ -1137,6 +1137,16 @@ def go_through_log_lines(logf):
                if this_machine != run_machine:
                    run_machine = this_machine
                    print(' * Found machine: {0}'.format(run_machine))
+        else:
+            # When not available (PIPE-3029) get it if in MPI mode
+            mpi_machine_re = 'MPI Enabled at host\s+(.+)\s+with'
+            if "MPI Enabled at" in line and not 'MPIServer' in line:
+                mpi_machine_match = re.search(mpi_machine_re, line)
+                if mpi_machine_match:
+                    this_machine = mpi_machine_match.group(1)
+                    if this_machine != run_machine:
+                        run_machine = this_machine
+                        print(' * Found machine from CASAmpi messages: {0}'.format(run_machine))
 
         version_re = 'CASA Version\s+([0-9A-Za-z\t ._\-]+)'
         if 'CASA Version' in line and 'MPIServer' not in line:
