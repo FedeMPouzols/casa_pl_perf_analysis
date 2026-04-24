@@ -785,7 +785,7 @@ def correct_casa_log_datetime(dt_str):
 
 
 def get_timestamp_from_casa_log_line(line):
-    log_date_time_re = '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
+    log_date_time_re = r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
 
     match = re.search(log_date_time_re, line)
     if not match:
@@ -929,13 +929,13 @@ def go_through_log_lines(logf):
 
             # find keyword parameters, on the left of '=' characters
             par_names = []
-            for found in re.finditer('([^\s]+)\s*=', params_str):
+            for found in re.finditer(r'([^\s]+)\s*=', params_str):
                 par_names.append(found.group(1))
 
             for lhs in par_names:
                 # Match the name on the lhs up to a comma followed by another 'keyword=' (or
                 # end of line, for the last argument)
-                par_re = '{0}\s*=\s*(.+?)(,\s*[^\s]+=|$)'.format(lhs)
+                par_re = r'{0}\s*=\s*(.+?)(,\s*[^\s]+=|$)'.format(lhs)
                 try:
                     par_match = re.search(par_re, params_str)
                 except re.error as exc:
@@ -958,7 +958,7 @@ def go_through_log_lines(logf):
         details_task_target = 'tclean'
         details_pattern = 'Executing {0}'.format(details_task_target)
         if parse_tclean and 'pipeline.' in line and details_pattern in line:
-            tclean_pars_re = 'Executing\s+tclean\((.+)\)'
+            tclean_pars_re = r'Executing\s+tclean\((.+)\)'
             tclean_pars_match = re.search(tclean_pars_re, line)
             if tclean_pars_match:
                 tclean_all_pars = tclean_pars_match.group(1)
@@ -974,7 +974,7 @@ def go_through_log_lines(logf):
             pipe_line_found = True
             pipe_cnt += 1
 
-            pipe_task_re = '.pipeline.([^:]+)::'
+            pipe_task_re = r'.pipeline.([^:]+)::'
             pipe_task_match = re.search(pipe_task_re, line)
             if pipe_task_match:
                 name = pipe_task_match.group(1)
@@ -1000,7 +1000,7 @@ def go_through_log_lines(logf):
 
                 #                for csp in pipe_c_specials:
                 #                    if csp in line:
-                pipe_long_task_re = '.pipeline.([^\s]+)'
+                pipe_long_task_re = r'.pipeline.([^\s]+)'
                 pipe_long_task_match = re.search(pipe_long_task_re, line)
                 if pipe_long_task_match:
                     csp = pipe_long_task_match.group(1)
@@ -1039,11 +1039,11 @@ def go_through_log_lines(logf):
             details = tasks_details_params[-1]
             if 'tclean' == details._name and (0 == mpi_server_cnt or
                                               'True' == details._params['parallel']):
-                cb_values_re = '([^\s]+) arcsec, ([^\s]+) arcsec, ([^\s]+) deg'
+                cb_values_re = r'([^\s]+) arcsec, ([^\s]+) arcsec, ([^\s]+) deg'
                 # Common Beam for chan : 0 : 0.027519 arcsec, 0.0220263 arcsec, -56.0013 deg
                 cb0_hdr = 'Beam for chan : 0 :'
                 if cb0_hdr in line:
-                    cb_chan0_re = '{0} {1}'.format(cb0_hdr, cb_values_re)
+                    cb_chan0_re = r'{0} {1}'.format(cb0_hdr, cb_values_re)
                     re_match = re.search(cb_chan0_re, line)
                     if re_match:
                         cbeam_chan0 = CommonBeamInfo(re_match.group(1), re_match.group(2),
@@ -1051,7 +1051,7 @@ def go_through_log_lines(logf):
                         details._further_info['common_beam_chan0'] = cbeam_chan0
                 # Common Beam : 0.027519 arcsec, 0.0220263 arcsec, -56.0013 deg
                 else:
-                    cb_re = 'Beam : {0}'.format(cb_values_re)
+                    cb_re = r'Beam : {0}'.format(cb_values_re)
                     re_match = re.search(cb_re, line)
                     if re_match:
                         cbeam = CommonBeamInfo(re_match.group(1), re_match.group(2),
@@ -1068,7 +1068,7 @@ def go_through_log_lines(logf):
         if (task_details_task_name == 'tclean' and
             major_cycle in line):
             details = tasks_details_params[-1]
-            cycle_re = '{0} (\d+)'.format(major_cycle)
+            cycle_re = r'{0} (\d+)'.format(major_cycle)
             re_match = re.search(cycle_re, line)
             if re_match:
                 idx = re_match.group(1)
@@ -1078,7 +1078,7 @@ def go_through_log_lines(logf):
         # def identify_first_eb
         # Look for a line that contains something like:
         # hifa_importdata(vis=['uid___A002_Xb8e961_Xb0d', 'uid___A002_Xb8f857_X1176', 'uid___A002_Xb91513_X1936'], session=['default', 'default', 'default'])
-        importdata_re = "hifa_importdata\s*\(\s*vis\s*=\s*\[\s*'(\w+)'"
+        importdata_re = r"hifa_importdata\s*\(\s*vis\s*=\s*\[\s*'(\w+)'"
         if not first_importdata_found and 'hifa_importdata' in line:
             id_match = re.search(importdata_re, line)
             if id_match:
@@ -1087,7 +1087,7 @@ def go_through_log_lines(logf):
                 print(' * Found first execution block uid: {0}'.
                        format(first_eb_uid))
 
-                importdata_all_asdms_re = "hifa_importdata\s*\(\s*vis\s*=\s*\[\s*([',\s\w]+)\s*\]\s*,"
+                importdata_all_asdms_re = r"hifa_importdata\s*\(\s*vis\s*=\s*\[\s*([',\s\w]+)\s*\]\s*,"
                 asdms_match = re.search(importdata_all_asdms_re, line)
                 if asdms_match:
                     asdms_all_text = asdms_match.group(1)
@@ -1099,8 +1099,8 @@ def go_through_log_lines(logf):
 
         # When running from EPPR,
         # Example Project+Timestamp ID: E2E5.1.00006.S_2017_09_12T19_54_03.778
-        # (was eppr_rawdir_re = "INFO\s+.+\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/")
-        eppr_rawdir_re = "\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/"
+        # (was eppr_rawdir_re = r"INFO\s+.+\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/")
+        eppr_rawdir_re = r"\s+Working directory:.+/(.+)/SOUS_.+/GOUS_.+/MOUS_([a-zA-Z0-9_]+)/"
         if 'Working directory:' in line:
             print (' * Found EPPR working dir line ' + line)
             rawdir_match = eppr_rawdir_re = re.search(eppr_rawdir_re, line)
@@ -1114,9 +1114,9 @@ def go_through_log_lines(logf):
         # example: importasdm(asdm="/lustre/naasc/users/scastro/pipeline/cycle5_testing/uid___A001_X879_X6d1/rawdata/uid___A002_Xb8e961_Xb0d"
         # Restricted to "standard" tests location
         # root_tests_dir = '/lustre/naasc/users/scastro/pipeline/cycle5_testing'
-        # importasdm_re = 'importasdm\(asdm="{0}/([a-zA-Z0-9_]+)/rawdata/'.format(root_tests_dir)
+        # importasdm_re = r'importasdm\(asdm="{0}/([a-zA-Z0-9_]+)/rawdata/'.format(root_tests_dir)
         # Should work with directory trees using "normal" characters
-        importasdm_re = 'importasdm\(asdm="[a-zA-Z0-9_\-/]+/([a-zA-Z0-9_]+)/rawdata/'
+        importasdm_re = r'importasdm\(asdm="[a-zA-Z0-9_\-/]+/([a-zA-Z0-9_]+)/rawdata/'
         if not first_id_or_importasdm_found and 'importasdm(asdm="' in line:
             iasdm_match = re.search(importasdm_re, line)
             if iasdm_match:
@@ -1127,8 +1127,8 @@ def go_through_log_lines(logf):
         # example: pipeline::pipeline::casa        Pipeline version 40738 (trunk) running on zuul03
         # This is too constraining when considering all ARCS naming conventions
         # (example_ arc-pl-proc09):
-        #    machine_re = 'running on\s+(\w+)'
-        machine_re = 'running on\s+(.+)'
+        #    machine_re = r'running on\s+(\w+)'
+        machine_re = r'running on\s+(.+)'
         if 'Pipeline version' in line and (
                 not 'MPIServer' in line and 'running on' in line):
            machine_match = re.search(machine_re, line)
@@ -1139,7 +1139,7 @@ def go_through_log_lines(logf):
                    print(' * Found machine: {0}'.format(run_machine))
         else:
             # When not available (PIPE-3029) get it if in MPI mode
-            mpi_machine_re = 'MPI Enabled at host\s+(.+)\s+with'
+            mpi_machine_re = r'MPI Enabled at host\s+(.+)\s+with'
             if "MPI Enabled at" in line and not 'MPIServer' in line:
                 mpi_machine_match = re.search(mpi_machine_re, line)
                 if mpi_machine_match:
@@ -1148,7 +1148,7 @@ def go_through_log_lines(logf):
                         run_machine = this_machine
                         print(' * Found machine from CASAmpi messages: {0}'.format(run_machine))
 
-        version_re = 'CASA Version\s+([0-9A-Za-z\t ._\-]+)'
+        version_re = r'CASA Version\s+([0-9A-Za-z\t ._\-]+)'
         if 'CASA Version' in line and 'MPIServer' not in line:
             version_match = re.search(version_re, line)
             if version_match:
@@ -1165,7 +1165,7 @@ def go_through_log_lines(logf):
         # check mpi
         older_mpi_server_str = '::casa::MPIServer-'
         if older_mpi_server_str in line and 'CASA' in line:
-            older_mpi_server_re = 'INFO\s+::casa::MPIServer-(\d+)\s+CASA\s+Version\s+'
+            older_mpi_server_re = r'INFO\s+::casa::MPIServer-(\d+)\s+CASA\s+Version\s+'
             mpi_match = re.search(older_mpi_server_re, line)
             if mpi_match:
                 server_idx = int(mpi_match.group(1))
@@ -1176,7 +1176,7 @@ def go_through_log_lines(logf):
         if newer_mpi_server_str_casa6 in line:
             print('*** Found MPI server line: {}'.format(line.strip()))
             # CASA 6+
-            newer_mpi_server_re = 'casa::MPIServer-(\d+)\s+MPI\s+Enabled\s+at\s+host\s+'
+            newer_mpi_server_re = r'casa::MPIServer-(\d+)\s+MPI\s+Enabled\s+at\s+host\s+'
             mpi_match = re.search(newer_mpi_server_re, line)
             if mpi_match:
                 server_idx = int(mpi_match.group(1))
@@ -1184,8 +1184,8 @@ def go_through_log_lines(logf):
                     mpi_server_cnt = server_idx
 
         # Handle begin/end task
-        begin_task_re = '#\s+Begin Task:\s+(\w+)\s+#'
-        end_task_re = '#\s+End Task:\s+(\w+)\s+#'
+        begin_task_re = r'#\s+Begin Task:\s+(\w+)\s+#'
+        end_task_re = r'#\s+End Task:\s+(\w+)\s+#'
 
         bt_match = re.search(begin_task_re, line)
         no_pipe_tier = False
@@ -1265,9 +1265,9 @@ def go_through_log_lines(logf):
         # Which in more recent times became:
         # 026-02-06 11:25:47     INFO    pipeline::pipeline.infrastructure.basetask::casa        Equivalent Pipeline CLI call: hifa_wvrgcalflag()
         older_stage_equiv_call_str = 'Equivalent CASA call:'
-        older_stage_equiv_call_re = older_stage_equiv_call_str + '\s+([a-zA-Z_]+)\('
+        older_stage_equiv_call_re = older_stage_equiv_call_str + r'\s+([a-zA-Z_]+)\('
         newer_stage_equiv_call_str = "Equivalent Pipeline CLI call:"
-        newer_stage_equiv_call_re = newer_stage_equiv_call_str + '\s+([a-zA-Z_]+)\('
+        newer_stage_equiv_call_re = newer_stage_equiv_call_str + r'\s+([a-zA-Z_]+)\('
         # stage_equiv_call_re = stage_equiv_call_str + '([a-zA-Z]+_[a-zA-Z]+)\('
         if (older_stage_equiv_call_str in line or newer_stage_equiv_call_str in line) and 'pipeline.infrastructure.basetask' in line:
             if older_stage_equiv_call_str in line:
@@ -1296,7 +1296,7 @@ def go_through_log_lines(logf):
 
         # Handle start/end of pipeline stages
         begin_stage_str = 'Starting execution for stage'
-        begin_stage_re = begin_stage_str + '\s+([0-9]+)'
+        begin_stage_re = begin_stage_str + r'\s+([0-9]+)'
         if begin_stage_str in line:
             bst_match = re.search(begin_stage_re, line)
             if bst_match:
